@@ -1,0 +1,33 @@
+{
+    "$schema": "./node_modules/oxfmt/configuration_schema.json",
+    "printWidth": 100,
+    "singleQuote": false,
+    "semi": true,
+    "useTabs": false,
+    "trailingComma": "es5",
+    "bracketSpacing": true,
+    "bracketSameLine": false,
+    "arrowParens": "avoid",
+    "endOfLine": "lf",
+    "editorconfig": true,
+    "ignorePatterns": [
+        "_old_project/**",
+        "**/node_modules/**",
+        "**/dist/**",
+        "**/dist-ssr/**",
+        "**/build/**",
+        "**/out/**",
+        "**/.next/**",
+        "**/.turbo/**",
+        "**/storybook-static/**",
+        "**/coverage/**",
+        "**/.mastra/**",
+        "**/docs/.dist/**",
+        "**/*.min.js",
+        "**/*.bundle.js",
+        "**/generated/**",
+        "frontend/src/generated/**",
+        ".resources/**",
+        ".claude/skill/**"
+    ]
+}

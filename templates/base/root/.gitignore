@@ -1,0 +1,17 @@
+node_modules
+dist
+dist-ssr
+coverage
+.turbo
+.tanstack
+.next
+storybook-static
+*.tsbuildinfo
+*.log
+.DS_Store
+.env
+.env.local
+.env.production
+.env.test
+.secrets
+.tmp

@@ -1,0 +1,55 @@
+{
+    "name": "@compozy/devstack",
+    "version": "0.1.0",
+    "description": "CLI scaffold generator for Compozy full-stack monorepos.",
+    "license": "MIT",
+    "bin": {
+        "devstack": "./bin/cli.ts"
+    },
+    "files": [
+        "bin",
+        "dist",
+        "src",
+        "templates"
+    ],
+    "type": "module",
+    "scripts": {
+        "prepare": "husky",
+        "build": "bun build ./src/index.ts --outdir dist --target bun",
+        "dev": "bun run ./src/index.ts",
+        "format": "bunx oxfmt --write .",
+        "format:check": "bunx oxfmt --check .",
+        "lint": "bunx oxfmt --check . && bunx oxlint src tests bin vitest.config.ts",
+        "lint:fix": "bunx oxlint --fix src tests bin vitest.config.ts",
+        "test": "bunx vitest run --config vitest.config.ts",
+        "typecheck": "tsc --noEmit"
+    },
+    "dependencies": {
+        "@clack/prompts": "^1.1.0",
+        "picocolors": "^1.1.1"
+    },
+    "devDependencies": {
+        "@commitlint/cli": "^20.4.4",
+        "@commitlint/config-conventional": "^20.4.4",
+        "@types/node": "^25.5.0",
+        "husky": "^9.1.7",
+        "lint-staged": "^16.3.3",
+        "oxfmt": "^0.40.0",
+        "oxlint": "^1.55.0",
+        "typescript": "^5.9.3",
+        "vitest": "^4.1.0"
+    },
+    "lint-staged": {
+        "*.{js,jsx,ts,tsx}": [
+            "oxfmt",
+            "oxlint"
+        ],
+        "*.{css,scss,html,json,jsonc,yaml,yml,md,markdown}": [
+            "oxfmt"
+        ]
+    },
+    "engines": {
+        "bun": ">=1.2.0"
+    },
+    "packageManager": "bun@1.3.4"
+}

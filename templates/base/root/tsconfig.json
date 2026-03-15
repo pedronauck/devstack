@@ -1,0 +1,16 @@
+{
+    "extends": "./tsconfig.base.json",
+    "compilerOptions": {
+        "jsx": "react-jsx",
+        "module": "ESNext",
+        "moduleResolution": "bundler",
+        "allowImportingTsExtensions": true,
+        "noEmit": true,
+        "paths": {
+            "@/*": ["./packages/frontend/src/*"]
+        },
+        "types": ["node", "vitest/globals"]
+    },
+    "include": ["commitlint.config.ts", "scripts/**/*.ts"],
+    "exclude": [".resources/**", "**/node_modules/**", "**/dist/**"]
+}

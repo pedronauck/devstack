@@ -1,0 +1,36 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+
+# Dependencies
+node_modules
+
+# Build
+dist
+dist-ssr
+out
+*.tsbuildinfo
+
+# Cache
+.turbo
+coverage
+
+# Environment
+.env
+.env.local
+.env.production
+.env.test
+.secrets
+
+# OS
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Temporary
+.tmp
+bun.lock

@@ -1,0 +1,67 @@
+{
+    "editor.formatOnSave": true,
+    "editor.formatOnPaste": true,
+    "editor.tabSize": 2,
+    "editor.insertSpaces": true,
+    "editor.detectIndentation": false,
+    "editor.codeActionsOnSave": {
+        "source.fixAll.oxc": "explicit",
+        "source.organizeImports": "explicit",
+        "source.removeUnusedImports": "explicit"
+    },
+
+    // Oxc Language Server Configuration
+    "oxc.enable": true,
+    "oxc.lint.run": "onType",
+    "oxc.trace.server": "off",
+
+    // Use Oxc formatter for all supported file types
+    "[javascript]": {
+        "editor.defaultFormatter": "oxc.oxc-vscode"
+    },
+    "[javascriptreact]": {
+        "editor.defaultFormatter": "oxc.oxc-vscode"
+    },
+    "[typescript]": {
+        "editor.defaultFormatter": "oxc.oxc-vscode"
+    },
+    "[typescriptreact]": {
+        "editor.defaultFormatter": "oxc.oxc-vscode"
+    },
+    "[yaml]": {
+        "editor.defaultFormatter": "oxc.oxc-vscode"
+    },
+    "[markdown]": {
+        "editor.defaultFormatter": "oxc.oxc-vscode"
+    },
+
+    // JSON files use 4 spaces
+    "[json]": {
+        "editor.defaultFormatter": "oxc.oxc-vscode",
+        "editor.tabSize": 4
+    },
+    "[jsonc]": {
+        "editor.defaultFormatter": "oxc.oxc-vscode",
+        "editor.tabSize": 4
+    },
+
+    // TypeScript configuration
+    "typescript.preferences.importModuleSpecifier": "relative",
+    "typescript.updateImportsOnFileMove.enabled": "always",
+    "javascript.updateImportsOnFileMove.enabled": "always",
+
+    // File exclusions
+    "files.exclude": {
+        "**/dist": true,
+        "**/.git": true,
+        "**/.DS_Store": true
+    },
+    "search.exclude": {
+        "**/dist": true,
+        "**/node_modules": true,
+        "**/templates": true
+    },
+
+    // Misc
+    "json.schemaDownload.enable": false
+}
