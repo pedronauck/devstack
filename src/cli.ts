@@ -1,10 +1,11 @@
 import * as p from "@clack/prompts";
 import color from "picocolors";
-import { MODULE_OPTIONS } from "./modules/types.ts";
+import { MODULE_OPTIONS, type StackModel } from "./modules/types.ts";
 
 export interface GeneratorConfig {
   projectName: string;
   targetDir: string;
+  stackModel: StackModel;
   selectedModules: string[];
   initGit: boolean;
   installDependencies: boolean;
@@ -54,6 +55,24 @@ export async function runCli(): Promise<GeneratorConfig> {
     })
   );
 
+  const stackModel = ensureNotCancelled(
+    await p.select({
+      message: "Choose your stack:",
+      options: [
+        {
+          value: "separated" as const,
+          label: "Separated (Hono API + Vite React)",
+          hint: "packages/frontend + packages/backend",
+        },
+        {
+          value: "tanstack-start" as const,
+          label: "TanStack Start (Fullstack)",
+          hint: "packages/app with Server Functions + SSR",
+        },
+      ],
+    })
+  );
+
   const selectedModules = ensureNotCancelled(
     await p.multiselect({
       message: "Select optional modules:",
@@ -79,6 +98,7 @@ export async function runCli(): Promise<GeneratorConfig> {
   return {
     projectName,
     targetDir,
+    stackModel,
     selectedModules,
     initGit,
     installDependencies,

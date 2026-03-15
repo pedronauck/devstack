@@ -21,6 +21,8 @@ export interface DockerService {
   };
 }
 
+export type StackModel = "separated" | "tanstack-start";
+
 export interface PackageContributions {
   dependencies?: Record<string, string>;
   devDependencies?: Record<string, string>;
@@ -45,6 +47,7 @@ export interface ModuleDefinition {
   root?: PackageContributions;
   frontend?: PackageContributions;
   backend?: PackageContributions;
+  app?: PackageContributions;
   claudeSection?: string;
   skills?: string[];
   skillMappings?: SkillMapping[];
@@ -125,10 +128,9 @@ export function resolveSelectedModules(
   };
 }
 
-export const BASE_SKILLS = [
-  // Core stack
+const SHARED_BASE_SKILLS = [
+  // Core stack (framework-agnostic)
   "react",
-  "hono",
   "typescript-advanced",
   "vitest",
   "es-toolkit",
@@ -170,23 +172,19 @@ export const BASE_SKILLS = [
   "to-prompt",
 ] as const;
 
-export const BASE_SKILL_MAPPINGS: SkillMapping[] = [
-  {
-    domain: "Backend + Hono",
-    keywords: [
-      "route",
-      "handler",
-      "API",
-      "usecase",
-      "repository",
-      "module",
-      "Hono",
-      "middleware",
-      "plugin",
-    ],
-    required: ["hono", "postgres-drizzle", "drizzle-orm"],
-    conditional: ["drizzle-safe-migrations"],
-  },
+const STACK_SPECIFIC_SKILLS: Record<StackModel, readonly string[]> = {
+  separated: ["hono"],
+  "tanstack-start": ["tanstack-start-best-practices"],
+};
+
+export function getBaseSkills(stackModel: StackModel): string[] {
+  return [...SHARED_BASE_SKILLS, ...STACK_SPECIFIC_SKILLS[stackModel]];
+}
+
+/** @deprecated Use getBaseSkills(stackModel) instead */
+export const BASE_SKILLS = [...SHARED_BASE_SKILLS, "hono"] as const;
+
+const SHARED_SKILL_MAPPINGS: SkillMapping[] = [
   {
     domain: "Validation / Zod",
     keywords: [
@@ -304,4 +302,67 @@ export const BASE_SKILL_MAPPINGS: SkillMapping[] = [
     ],
     required: ["typescript-advanced"],
   },
+];
+
+const STACK_SPECIFIC_SKILL_MAPPINGS: Record<StackModel, SkillMapping[]> = {
+  separated: [
+    {
+      domain: "Backend + Hono",
+      keywords: [
+        "route",
+        "handler",
+        "API",
+        "usecase",
+        "repository",
+        "module",
+        "Hono",
+        "middleware",
+        "plugin",
+      ],
+      required: ["hono", "postgres-drizzle", "drizzle-orm"],
+      conditional: ["drizzle-safe-migrations"],
+    },
+  ],
+  "tanstack-start": [
+    {
+      domain: "Server + TanStack Start",
+      keywords: [
+        "server function",
+        "createServerFn",
+        "API route",
+        "loader",
+        "server",
+        "usecase",
+        "repository",
+        "middleware",
+      ],
+      required: ["tanstack-start-best-practices", "postgres-drizzle", "drizzle-orm"],
+      conditional: ["drizzle-safe-migrations"],
+    },
+  ],
+};
+
+export function getBaseSkillMappings(stackModel: StackModel): SkillMapping[] {
+  return [...STACK_SPECIFIC_SKILL_MAPPINGS[stackModel], ...SHARED_SKILL_MAPPINGS];
+}
+
+/** @deprecated Use getBaseSkillMappings(stackModel) instead */
+export const BASE_SKILL_MAPPINGS: SkillMapping[] = [
+  {
+    domain: "Backend + Hono",
+    keywords: [
+      "route",
+      "handler",
+      "API",
+      "usecase",
+      "repository",
+      "module",
+      "Hono",
+      "middleware",
+      "plugin",
+    ],
+    required: ["hono", "postgres-drizzle", "drizzle-orm"],
+    conditional: ["drizzle-safe-migrations"],
+  },
+  ...SHARED_SKILL_MAPPINGS,
 ];
