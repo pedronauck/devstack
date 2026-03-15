@@ -102,7 +102,7 @@ function buildRootPackageJson(context: GenerateContext): PackageJsonShape {
       typecheck: "bunx tsgo --project tsconfig.json --noEmit && turbo run typecheck",
       format: "bunx oxfmt --write .",
       "format:check": "bunx oxfmt --check .",
-      test: "bunx vitest run",
+      test: "turbo run test",
       "db:generate": "turbo run db:generate",
       "db:migrate": "turbo run db:migrate",
     },

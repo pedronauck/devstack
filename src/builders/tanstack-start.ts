@@ -1,3 +1,4 @@
+import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { MODULE_REGISTRY } from "../modules/index.ts";
 import {
@@ -64,6 +65,18 @@ async function copyFrontendSharedAssets(context: GenerateContext) {
     const srcDir = path.join(BASE_FRONTEND_DIR, "src", dir);
     if (await pathExists(srcDir)) {
       await copyDirectory(srcDir, path.join(appSrcDir, dir), context.tokens);
+    }
+  }
+
+  const sharedFiles = ["test-setup.ts"];
+  for (const fileName of sharedFiles) {
+    const sourcePath = path.join(BASE_FRONTEND_DIR, "src", fileName);
+    if (await pathExists(sourcePath)) {
+      const content = await readFile(sourcePath, "utf8");
+      await writeTextFile(
+        path.join(appSrcDir, fileName),
+        replaceTemplateTokens(content, context.tokens)
+      );
     }
   }
 }
@@ -322,7 +335,7 @@ function buildRootPackageJson(context: GenerateContext): PackageJsonShape {
       typecheck: "bunx tsgo --project tsconfig.json --noEmit && turbo run typecheck",
       format: "bunx oxfmt --write .",
       "format:check": "bunx oxfmt --check .",
-      test: "bunx vitest run",
+      test: "turbo run test",
       "db:generate": "turbo run db:generate",
       "db:migrate": "turbo run db:migrate",
     },
@@ -702,6 +715,7 @@ function buildAppTsConfig() {
       isolatedModules: true,
       noEmit: true,
       paths: {
+        "@/*": ["./src/*"],
         "~/*": ["./*"],
       },
     },
@@ -1220,6 +1234,12 @@ function buildEnvTs(context: GenerateContext) {
   }
   if (context.resolvedModules.includes("redis")) {
     fields.push('  REDIS_URL: z.string().default("redis://localhost:6379"),');
+    fields.push("  RATE_LIMIT_WINDOW_MS: z.coerce.number().int().positive().default(60000),");
+    fields.push(
+      "  RATE_LIMIT_AUTHENTICATED_LIMIT: z.coerce.number().int().positive().default(300),"
+    );
+    fields.push("  RATE_LIMIT_PUBLIC_LIMIT: z.coerce.number().int().positive().default(30),");
+    fields.push("  RATE_LIMIT_WEBHOOK_LIMIT: z.coerce.number().int().positive().default(120),");
   }
 
   return [
@@ -1365,7 +1385,15 @@ function buildEnvExample(context: GenerateContext) {
     lines.push("# Observability", "SENTRY_DSN=", "");
   }
   if (context.resolvedModules.includes("redis")) {
-    lines.push("# Redis", "REDIS_URL=redis://localhost:6379", "");
+    lines.push(
+      "# Redis",
+      "REDIS_URL=redis://localhost:6379",
+      "RATE_LIMIT_WINDOW_MS=60000",
+      "RATE_LIMIT_AUTHENTICATED_LIMIT=300",
+      "RATE_LIMIT_PUBLIC_LIMIT=30",
+      "RATE_LIMIT_WEBHOOK_LIMIT=120",
+      ""
+    );
   }
 
   return lines.join("\n");

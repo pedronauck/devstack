@@ -1,10 +1,20 @@
 {
-    "version": 1,
-    "skills": {
-        "brainstorming": {
-            "source": "pedronauck/skills",
-            "sourceType": "github",
-            "computedHash": "3d898aa741852ad3f01954ba69c3b5b5e132931a570ca6319138bb610747f9c4"
-        }
+  "version": 1,
+  "skills": {
+    "brainstorming": {
+      "source": "pedronauck/skills",
+      "sourceType": "github",
+      "computedHash": "3d898aa741852ad3f01954ba69c3b5b5e132931a570ca6319138bb610747f9c4"
+    },
+    "testing-anti-patterns": {
+      "source": "pedronauck/skills",
+      "sourceType": "github",
+      "computedHash": "860d67709789aae9b98c6a58a97ff4e3ab7f280e4663e7ee656d8c6370a29ea5"
+    },
+    "vitest": {
+      "source": "pedronauck/skills",
+      "sourceType": "github",
+      "computedHash": "669c7275f7e1379b06b2bcfa593603aead4c983b951c7e8edbc09640aa38d0a1"
     }
+  }
 }

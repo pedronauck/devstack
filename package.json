@@ -23,6 +23,7 @@
         "lint": "bunx oxfmt --check . && bunx oxlint src tests bin vitest.config.ts",
         "lint:fix": "bunx oxlint --fix src tests bin vitest.config.ts",
         "test": "bunx vitest run --config vitest.config.ts",
+        "test:coverage": "bunx vitest run --config vitest.config.ts --coverage",
         "typecheck": "tsc --noEmit"
     },
     "dependencies": {
@@ -33,6 +34,7 @@
         "@commitlint/cli": "^20.4.4",
         "@commitlint/config-conventional": "^20.4.4",
         "@types/node": "^25.5.0",
+        "@vitest/coverage-v8": "4.1.0",
         "husky": "^9.1.7",
         "lint-staged": "^16.3.3",
         "oxfmt": "^0.40.0",
