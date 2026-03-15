@@ -11,4 +11,13 @@ export const organizationsModule: ModuleDefinition = {
 - Roles are generic: \`owner\`, \`admin\`, \`member\`.
 - Superadmins can override org scope with \`X-Organization-Id\`.
 `,
+  skills: ["organization-best-practices"],
+  skillMappings: [
+    {
+      domain: "Organizations / multi-tenant",
+      keywords: ["organization", "tenant", "membership", "invitation", "role", "RBAC", "team"],
+      required: ["organization-best-practices"],
+      conditional: ["better-auth-best-practices"],
+    },
+  ],
 };

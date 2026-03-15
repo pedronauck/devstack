@@ -1,0 +1,3 @@
+[submodule "vendor/skills"]
+	path = vendor/skills
+	url = git@github.com:pedronauck/skills.git

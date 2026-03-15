@@ -22,4 +22,18 @@ export const stripeModule: ModuleDefinition = {
 - Billing routes are mounted at \`/api/v1/billing\`.
 - Keep webhook verification on the raw request body.
 `,
+  skills: [
+    "stripe-best-practices",
+    "stripe-integration",
+    "stripe-subscriptions",
+    "stripe-webhooks",
+  ],
+  skillMappings: [
+    {
+      domain: "Payments / Stripe",
+      keywords: ["stripe", "subscription", "webhook", "billing", "payment", "checkout"],
+      required: ["stripe-integration", "stripe-best-practices"],
+      conditional: ["stripe-subscriptions", "stripe-webhooks"],
+    },
+  ],
 };

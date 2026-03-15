@@ -40,4 +40,19 @@ export const inngestModule: ModuleDefinition = {
       inngest: "^3.52.6",
     },
   },
+  skills: ["inngest"],
+  skillMappings: [
+    {
+      domain: "Inngest",
+      keywords: [
+        "inngest",
+        "background job",
+        "event-driven",
+        "workflow",
+        "durable execution",
+        "step function",
+      ],
+      required: ["inngest"],
+    },
+  ],
 };

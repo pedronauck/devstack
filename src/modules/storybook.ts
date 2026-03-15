@@ -21,4 +21,13 @@ export const storybookModule: ModuleDefinition = {
       storybook: "storybook dev -p 6006",
     },
   },
+  skills: ["storybook"],
+  skillMappings: [
+    {
+      domain: "Storybook",
+      keywords: ["storybook", "story", "stories", "CSF", "component docs", "visual testing"],
+      required: ["storybook"],
+      conditional: ["react"],
+    },
+  ],
 };

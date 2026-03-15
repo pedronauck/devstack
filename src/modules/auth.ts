@@ -22,4 +22,12 @@ export const authModule: ModuleDefinition = {
 - Session middleware protects \`/api/v1/*\`.
 - Regenerate Better Auth schema when auth plugins change.
 `,
+  skills: ["better-auth-best-practices"],
+  skillMappings: [
+    {
+      domain: "Authentication",
+      keywords: ["auth", "session", "login", "signup", "Better Auth", "betterauth", "auth.ts"],
+      required: ["better-auth-best-practices"],
+    },
+  ],
 };

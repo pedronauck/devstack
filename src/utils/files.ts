@@ -110,5 +110,29 @@ export async function pathExists(filePath: string) {
   }
 }
 
+export async function copySelectedSubdirectories(
+  sourceDir: string,
+  targetDir: string,
+  selectedNames: Set<string>,
+  variables: TemplateVariables
+) {
+  await ensureDirectory(targetDir);
+  const entries = await readdir(sourceDir, { withFileTypes: true });
+
+  for (const entry of entries) {
+    if (!entry.isDirectory()) {
+      continue;
+    }
+
+    if (!selectedNames.has(entry.name)) {
+      continue;
+    }
+
+    const src = path.join(sourceDir, entry.name);
+    const dest = path.join(targetDir, entry.name);
+    await copyDirectoryWithTemplates(src, dest, variables);
+  }
+}
+
 export const ensureDir = ensureDirectory;
 export const fileExists = pathExists;

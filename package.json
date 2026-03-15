@@ -10,7 +10,8 @@
         "bin",
         "dist",
         "src",
-        "templates"
+        "templates",
+        "vendor"
     ],
     "type": "module",
     "scripts": {

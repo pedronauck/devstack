@@ -27,6 +27,13 @@ export interface PackageContributions {
   scripts?: Record<string, string>;
 }
 
+export interface SkillMapping {
+  domain: string;
+  keywords: string[];
+  required: string[];
+  conditional?: string[];
+}
+
 export interface ModuleDefinition {
   name: ModuleName;
   label: string;
@@ -39,6 +46,8 @@ export interface ModuleDefinition {
   frontend?: PackageContributions;
   backend?: PackageContributions;
   claudeSection?: string;
+  skills?: string[];
+  skillMappings?: SkillMapping[];
 }
 
 export type ModuleName = (typeof MODULE_ORDER)[number];
@@ -115,3 +124,184 @@ export function resolveSelectedModules(
     resolvedModules: MODULE_ORDER.filter(moduleName => selection.has(moduleName)),
   };
 }
+
+export const BASE_SKILLS = [
+  // Core stack
+  "react",
+  "hono",
+  "typescript-advanced",
+  "vitest",
+  "es-toolkit",
+  "zod",
+  "postgres-drizzle",
+  "drizzle-orm",
+  "drizzle-safe-migrations",
+  // Frontend
+  "tanstack-router-best-practices",
+  "tanstack-query-best-practices",
+  "zustand",
+  "shadcn",
+  "shadcn-ui",
+  "building-components",
+  "frontend-design",
+  "ui-ux-pro-max",
+  "web-design-guidelines",
+  "bencium-innovative-ux-designer",
+  "interface-design",
+  "vercel-react-best-practices",
+  "vercel-composition-patterns",
+  "app-renderer-systems",
+  // Process & quality
+  "brainstorming",
+  "executing-plans",
+  "no-workarounds",
+  "systematic-debugging",
+  "test-antipatterns",
+  "verification-before-completion",
+  "adversarial-review",
+  "architectural-analysis",
+  "fix-coderabbit-review",
+  "git-rebase",
+  "skills-best-practices",
+  "find-skills",
+  // Tools
+  "exa-web-search-free",
+  "pal",
+  "to-prompt",
+] as const;
+
+export const BASE_SKILL_MAPPINGS: SkillMapping[] = [
+  {
+    domain: "Backend + Hono",
+    keywords: [
+      "route",
+      "handler",
+      "API",
+      "usecase",
+      "repository",
+      "module",
+      "Hono",
+      "middleware",
+      "plugin",
+    ],
+    required: ["hono", "postgres-drizzle", "drizzle-orm"],
+    conditional: ["drizzle-safe-migrations"],
+  },
+  {
+    domain: "Validation / Zod",
+    keywords: [
+      "zod",
+      "z.object",
+      "z.string",
+      "safeParse",
+      "z.infer",
+      "schema validation",
+      "parse",
+      "transform",
+    ],
+    required: ["zod"],
+  },
+  {
+    domain: "Frontend + React",
+    keywords: [
+      "component",
+      "hook",
+      "JSX",
+      "TSX",
+      "render",
+      "state",
+      "props",
+      "UI",
+      "layout",
+      "page",
+      "form",
+    ],
+    required: ["react"],
+    conditional: ["shadcn", "building-components"],
+  },
+  {
+    domain: "Frontend + TanStack",
+    keywords: ["query", "mutation", "TanStack Query", "cache", "invalidation", "refetch"],
+    required: ["tanstack-query-best-practices", "react"],
+    conditional: ["tanstack-router-best-practices"],
+  },
+  {
+    domain: "Frontend + Design",
+    keywords: ["UI design", "UX", "design system", "visual fidelity", "interface", "responsive"],
+    required: ["frontend-design", "ui-ux-pro-max"],
+    conditional: ["web-design-guidelines", "shadcn"],
+  },
+  {
+    domain: "React performance",
+    keywords: ["performance", "memoization", "lazy", "Suspense", "code splitting"],
+    required: ["vercel-react-best-practices"],
+    conditional: ["vercel-composition-patterns", "react"],
+  },
+  {
+    domain: "State + Zustand",
+    keywords: ["store", "state management", "zustand", "selector"],
+    required: ["zustand"],
+  },
+  {
+    domain: "es-toolkit / utilities",
+    keywords: [
+      "es-toolkit",
+      "lodash",
+      "utility function",
+      "debounce",
+      "throttle",
+      "groupBy",
+      "pick",
+      "omit",
+    ],
+    required: ["es-toolkit"],
+  },
+  {
+    domain: "Bug fix",
+    keywords: ["bug", "fix", "error", "failure", "crash", "unexpected", "broken", "regression"],
+    required: ["systematic-debugging", "no-workarounds"],
+    conditional: ["test-antipatterns"],
+  },
+  {
+    domain: "Writing tests",
+    keywords: ["test", "spec", "mock", "stub", "fixture", "assertion", "coverage", "vitest"],
+    required: ["vitest", "test-antipatterns"],
+  },
+  {
+    domain: "Task completion",
+    keywords: ["done", "complete", "finished", "ship"],
+    required: ["verification-before-completion"],
+  },
+  {
+    domain: "Architecture audit",
+    keywords: ["architecture audit", "dead code", "code smell", "anti-pattern", "duplication"],
+    required: ["architectural-analysis"],
+  },
+  {
+    domain: "Interface/App design",
+    keywords: ["dashboard", "admin panel", "app interface", "interactive product"],
+    required: ["interface-design", "bencium-innovative-ux-designer"],
+    conditional: ["frontend-design", "ui-ux-pro-max"],
+  },
+  {
+    domain: "Creative/new features",
+    keywords: ["brainstorm", "idea", "new feature", "creative"],
+    required: ["brainstorming"],
+  },
+  {
+    domain: "Plan execution",
+    keywords: ["plan", "execute", "implement", "step by step"],
+    required: ["executing-plans"],
+  },
+  {
+    domain: "TypeScript advanced",
+    keywords: [
+      "generics",
+      "conditional types",
+      "mapped types",
+      "template literals",
+      "utility types",
+    ],
+    required: ["typescript-advanced"],
+  },
+];
