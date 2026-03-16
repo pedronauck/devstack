@@ -18,6 +18,8 @@
         "prepare": "husky",
         "build": "bun build ./src/index.ts --outdir dist --target bun",
         "dev": "bun run ./src/index.ts",
+        "deps:templates:audit": "bun run ./bin/audit-template-deps.ts",
+        "deps:templates:update": "bun run ./bin/audit-template-deps.ts --write",
         "format": "bunx oxfmt --write .",
         "format:check": "bunx oxfmt --check .",
         "lint": "bunx oxfmt --check . && bunx oxlint src tests bin vitest.config.ts",

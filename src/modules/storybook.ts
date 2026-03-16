@@ -7,11 +7,11 @@ export const storybookModule: ModuleDefinition = {
   root: {
     devDependencies: {
       "@chromatic-com/storybook": "^5.0.1",
-      "@storybook/addon-a11y": "^10.2.17",
-      "@storybook/addon-docs": "^10.2.17",
-      "@storybook/addon-onboarding": "^10.2.17",
-      "@storybook/addon-themes": "^10.2.17",
-      "@storybook/react": "^10.2.17",
+      "@storybook/addon-a11y": "^10.2.19",
+      "@storybook/addon-docs": "^10.2.19",
+      "@storybook/addon-onboarding": "^10.2.19",
+      "@storybook/addon-themes": "^10.2.19",
+      "@storybook/react": "^10.2.19",
       storybook: "^10.2.17",
     },
   },

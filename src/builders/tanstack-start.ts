@@ -193,7 +193,7 @@ async function writeAppDynamicFiles(context: GenerateContext) {
   await ensureDir(path.join(appDir, "src/integrations/tanstack-query"));
 
   await writeTextFile(path.join(appDir, "package.json"), toJson(buildAppPackageJson(context)));
-  await writeTextFile(path.join(appDir, "app.config.ts"), buildAppConfigTs());
+  await writeTextFile(path.join(appDir, "vite.config.ts"), buildAppViteConfig());
   await writeTextFile(path.join(appDir, "tsconfig.json"), toJson(buildAppTsConfig()));
   await writeTextFile(path.join(appDir, "drizzle.config.ts"), buildDrizzleConfig());
   await writeTextFile(path.join(appDir, "vitest.config.ts"), buildVitestConfig(context));
@@ -374,19 +374,19 @@ function buildRootPackageJson(context: GenerateContext): PackageJsonShape {
       "db:migrate": "turbo run db:migrate",
     },
     devDependencies: {
-      "@commitlint/cli": "^20.4.4",
-      "@commitlint/config-conventional": "^20.4.4",
-      "@tanstack/router-plugin": "1.166.7",
+      "@commitlint/cli": "^20.5.0",
+      "@commitlint/config-conventional": "^20.5.0",
+      "@tanstack/router-plugin": "1.166.12",
       "@testing-library/jest-dom": "^6.9.1",
       "@types/jsdom": "^28.0.0",
       "@types/node": "^25.5.0",
       "@types/react": "19.2.14",
       "@types/react-dom": "19.2.3",
-      "@typescript/native-preview": "^7.0.0-dev.20260312.1",
+      "@typescript/native-preview": "^7.0.0-dev.20260316.1",
       "@vitest/ui": "4.1.0",
       husky: "9.1.7",
       jsdom: "^28.1.0",
-      "lint-staged": "16.3.3",
+      "lint-staged": "16.4.0",
       oxfmt: "^0.40.0",
       oxlint: "1.55.0",
       tailwindcss: "4.2.1",
@@ -632,8 +632,8 @@ function buildAppPackageJson(context: GenerateContext): PackageJsonShape {
     private: true,
     type: "module",
     scripts: {
-      dev: "vinxi dev --port 3000",
-      build: "vinxi build",
+      dev: "vite dev",
+      build: "vite build",
       start: "node .output/server/index.mjs",
       test: "bunx vitest run",
       typecheck: "bunx tsgo --noEmit",
@@ -650,9 +650,9 @@ function buildAppPackageJson(context: GenerateContext): PackageJsonShape {
       "@tabler/icons-react": "^3.40.0",
       "@tanstack/react-query": "^5.90.21",
       "@tanstack/react-query-devtools": "^5.91.3",
-      "@tanstack/react-router": "^1.166.7",
-      "@tanstack/react-router-devtools": "^1.166.7",
-      "@tanstack/react-start": "^1.166.7",
+      "@tanstack/react-router": "^1.167.3",
+      "@tanstack/react-router-devtools": "^1.166.9",
+      "@tanstack/react-start": "^1.166.14",
       "class-variance-authority": "^0.7.1",
       clsx: "^2.1.1",
       cmdk: "^1.1.1",
@@ -668,7 +668,7 @@ function buildAppPackageJson(context: GenerateContext): PackageJsonShape {
       "react-day-picker": "^9.14.0",
       "react-dom": "^19.2.4",
       "react-hook-form": "^7.71.2",
-      "react-resizable-panels": "^4.7.2",
+      "react-resizable-panels": "^4.7.3",
       recharts: "2.15.4",
       sonner: "^2.0.7",
       "tailwind-merge": "^3.5.0",
@@ -676,7 +676,6 @@ function buildAppPackageJson(context: GenerateContext): PackageJsonShape {
       "tw-animate-css": "^1.4.0",
       uuid: "^13.0.0",
       vaul: "^1.1.2",
-      vinxi: "^0.6.3",
       zod: "^4.3.6",
       zustand: "^5.0.11",
     },
@@ -684,9 +683,10 @@ function buildAppPackageJson(context: GenerateContext): PackageJsonShape {
       "@tailwindcss/vite": "^4.2.1",
       "@testing-library/dom": "^10.4.1",
       "@testing-library/react": "^16.3.2",
-      "@vitejs/plugin-react": "^6.0.0",
+      "@vitejs/plugin-react": "^6.0.1",
       "drizzle-kit": "^0.31.9",
       dotenv: "^17.3.1",
+      "vite-tsconfig-paths": "^6.1.1",
       vitest: "4.1.0",
     },
   };
@@ -715,22 +715,26 @@ function buildAppPackageJson(context: GenerateContext): PackageJsonShape {
 // App config files
 // ---------------------------------------------------------------------------
 
-function buildAppConfigTs() {
+function buildAppViteConfig() {
   return [
-    'import { defineConfig } from "@tanstack/react-start/config";',
     'import tailwindcss from "@tailwindcss/vite";',
+    'import { tanstackStart } from "@tanstack/react-start/plugin/vite";',
+    'import viteReact from "@vitejs/plugin-react";',
+    'import { defineConfig } from "vite";',
     'import tsConfigPaths from "vite-tsconfig-paths";',
     "",
     "export default defineConfig({",
-    "  tsr: {",
-    '    appDirectory: "src",',
+    "  server: {",
+    "    port: 3000,",
     "  },",
-    "  vite: {",
-    "    plugins: () => [",
-    '      tsConfigPaths({ projects: ["./tsconfig.json"] }),',
-    "      tailwindcss(),",
-    "    ],",
-    "  },",
+    "  plugins: [",
+    "    tailwindcss(),",
+    '    tsConfigPaths({ projects: ["./tsconfig.json"] }),',
+    "    tanstackStart({",
+    '      srcDirectory: "src",',
+    "    }),",
+    "    viteReact(),",
+    "  ],",
     "});",
     "",
   ].join("\n");
@@ -755,7 +759,7 @@ function buildAppTsConfig() {
         "~/*": ["./*"],
       },
     },
-    include: ["src", "server", "app.config.ts"],
+    include: ["src", "server", "vite.config.ts"],
   };
 }
 
@@ -953,7 +957,7 @@ function buildRouteTreeStub() {
     "",
     'import { createFileRoute } from "@tanstack/react-router";',
     "",
-    "// placeholder — will be overwritten on first `vinxi dev` run",
+    "// placeholder — will be overwritten on first `vite dev` run",
     "export const routeTree = {} as never;",
     "",
   ].join("\n");

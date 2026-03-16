@@ -32,8 +32,8 @@ export const storageModule: ModuleDefinition = {
   ],
   backend: {
     dependencies: {
-      "@aws-sdk/client-s3": "^3.1008.0",
-      "@aws-sdk/s3-request-presigner": "^3.1008.0",
+      "@aws-sdk/client-s3": "^3.1009.0",
+      "@aws-sdk/s3-request-presigner": "^3.1009.0",
     },
   },
 };

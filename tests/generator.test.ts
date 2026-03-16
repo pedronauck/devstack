@@ -77,13 +77,22 @@ describe("generateProject", () => {
   it("creates a usable TanStack Start app shell with the expected shared test setup and aliases", async () => {
     const targetDir = await scaffoldProject({ stackModel: "tanstack-start" });
     const appDir = path.join(targetDir, "packages/app");
+    const packageJson = JSON.parse(await readFile(path.join(appDir, "package.json"), "utf8"));
     const tsconfig = JSON.parse(await readFile(path.join(appDir, "tsconfig.json"), "utf8"));
+    const viteConfig = await readFile(path.join(appDir, "vite.config.ts"), "utf8");
     const testSetup = await readFile(path.join(appDir, "src/test-setup.ts"), "utf8");
 
+    expect(packageJson.scripts.dev).toBe("vite dev");
+    expect(packageJson.scripts.build).toBe("vite build");
+    expect(packageJson.dependencies.vinxi).toBeUndefined();
+    expect(packageJson.devDependencies["vite-tsconfig-paths"]).toBe("^6.1.1");
     expect(tsconfig.compilerOptions.paths).toMatchObject({
       "@/*": ["./src/*"],
       "~/*": ["./*"],
     });
+    expect(tsconfig.include).toContain("vite.config.ts");
+    expect(viteConfig).toContain("@tanstack/react-start/plugin/vite");
+    expect(viteConfig).toContain("tanstackStart({");
     expect(testSetup).toContain('import "@testing-library/jest-dom";');
     expect(testSetup).toContain("window.ResizeObserver = ResizeObserverMock;");
   });
