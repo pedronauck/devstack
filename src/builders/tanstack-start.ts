@@ -202,7 +202,7 @@ async function writeAppDynamicFiles(context: GenerateContext) {
   await writeTextFile(path.join(appDir, "src/client.tsx"), buildClientEntry());
   await writeTextFile(path.join(appDir, "src/server.ts"), buildServerEntry(context));
   await writeTextFile(path.join(appDir, "src/router.tsx"), buildRouterEntry());
-  await writeTextFile(path.join(appDir, "src/routeTree.gen.ts"), buildRouteTreeStub());
+  await writeTextFile(path.join(appDir, "src/routeTree.gen.ts"), buildRouteTree(context));
 
   // Routes
   await writeTextFile(path.join(appDir, "src/routes/__root.tsx"), buildRootRoute(context));
@@ -746,6 +746,7 @@ function buildAppTsConfig() {
       target: "ES2022",
       module: "ESNext",
       moduleResolution: "bundler",
+      allowImportingTsExtensions: true,
       jsx: "react-jsx",
       strict: true,
       esModuleInterop: true,
@@ -754,6 +755,7 @@ function buildAppTsConfig() {
       resolveJsonModule: true,
       isolatedModules: true,
       noEmit: true,
+      types: ["vite/client"],
       paths: {
         "@/*": ["./src/*"],
         "~/*": ["./*"],
@@ -943,22 +945,217 @@ function buildRouterEntry() {
   ].join("\n");
 }
 
-function buildRouteTreeStub() {
+type TanStackRouteDefinition = {
+  filePath: string;
+  fileRoutePath: string;
+  fileRouteId: string;
+  fullPath: string;
+  importName: string;
+  importPath: string;
+  parentRoute: "rootRouteImport" | "DashboardRoute";
+  path: string;
+};
+
+function buildRouteTree(context: GenerateContext) {
+  const routes: TanStackRouteDefinition[] = [
+    {
+      filePath: "/_dashboard",
+      fileRoutePath: "",
+      fileRouteId: "/_dashboard",
+      fullPath: "/",
+      importName: "DashboardRoute",
+      importPath: "./routes/_dashboard",
+      parentRoute: "rootRouteImport",
+      path: "",
+    },
+    {
+      filePath: "/_dashboard/",
+      fileRoutePath: "/",
+      fileRouteId: "/",
+      fullPath: "/",
+      importName: "DashboardIndexRoute",
+      importPath: "./routes/_dashboard/index",
+      parentRoute: "DashboardRoute",
+      path: "/",
+    },
+    {
+      filePath: "/api/health",
+      fileRoutePath: "/api/health",
+      fileRouteId: "/api/health",
+      fullPath: "/api/health",
+      importName: "ApiHealthRoute",
+      importPath: "./routes/api/health",
+      parentRoute: "rootRouteImport",
+      path: "/api/health",
+    },
+    {
+      filePath: "/_dashboard/settings",
+      fileRoutePath: "/settings",
+      fileRouteId: "/settings",
+      fullPath: "/settings",
+      importName: "DashboardSettingsRoute",
+      importPath: "./routes/_dashboard/settings",
+      parentRoute: "DashboardRoute",
+      path: "/settings",
+    },
+  ];
+
+  if (context.resolvedModules.includes("auth")) {
+    routes.push({
+      filePath: "/api/auth/$",
+      fileRoutePath: "/api/auth/$",
+      fileRouteId: "/api/auth/$",
+      fullPath: "/api/auth/$",
+      importName: "ApiAuthSplatRoute",
+      importPath: "./routes/api/auth/$",
+      parentRoute: "rootRouteImport",
+      path: "/api/auth/$",
+    });
+  }
+
+  if (context.resolvedModules.includes("stripe")) {
+    routes.push({
+      filePath: "/api/webhooks/stripe",
+      fileRoutePath: "/api/webhooks/stripe",
+      fileRouteId: "/api/webhooks/stripe",
+      fullPath: "/api/webhooks/stripe",
+      importName: "ApiWebhooksStripeRoute",
+      importPath: "./routes/api/webhooks/stripe",
+      parentRoute: "rootRouteImport",
+      path: "/api/webhooks/stripe",
+    });
+  }
+
+  if (context.resolvedModules.includes("inngest")) {
+    routes.push({
+      filePath: "/api/inngest",
+      fileRoutePath: "/api/inngest",
+      fileRouteId: "/api/inngest",
+      fullPath: "/api/inngest",
+      importName: "ApiInngestRoute",
+      importPath: "./routes/api/inngest",
+      parentRoute: "rootRouteImport",
+      path: "/api/inngest",
+    });
+  }
+
+  const dashboardLayoutRoute = routes.find(route => route.importName === "DashboardRoute");
+  const dashboardChildRoutes = routes.filter(route => route.parentRoute === "DashboardRoute");
+  const rootLeafRoutes = routes.filter(
+    route => route.parentRoute === "rootRouteImport" && route.importName !== "DashboardRoute"
+  );
+  const addressableRoutes = routes.filter(route => route.importName !== "DashboardRoute");
+  const fileRouteIdEntries = [
+    '  "__root__": typeof rootRouteImport;',
+    `  "${dashboardLayoutRoute?.filePath}": typeof DashboardRouteWithChildren;`,
+    ...addressableRoutes.map(route => `  "${route.filePath}": typeof ${route.importName};`),
+  ];
+  const fileRouteTypeIds = [
+    '"__root__"',
+    `"${dashboardLayoutRoute?.filePath}"`,
+    ...addressableRoutes.map(route => `"${route.filePath}"`),
+  ];
+  const fullPaths = Array.from(new Set(addressableRoutes.map(route => route.fullPath)));
+  const rootChildren = [
+    "DashboardRoute: typeof DashboardRouteWithChildren;",
+    ...rootLeafRoutes.map(route => `${route.importName}: typeof ${route.importName};`),
+  ];
+  const dashboardChildren = dashboardChildRoutes.map(
+    route => `${route.importName}: typeof ${route.importName};`
+  );
+
   return [
-    "/* prettier-ignore-start */",
-    "",
     "/* eslint-disable */",
     "",
     "// @ts-nocheck",
     "",
     "// noinspection JSUnusedGlobalSymbols",
     "",
-    "// This file is auto-generated by TanStack Router",
+    "// This file was automatically generated by Devstack for the initial scaffold.",
+    "// TanStack Start may update it during development or build as routes evolve.",
     "",
-    'import { createFileRoute } from "@tanstack/react-router";',
+    'import { Route as rootRouteImport } from "./routes/__root";',
+    ...routes.map(
+      route => `import { Route as ${route.importName}Import } from "${route.importPath}";`
+    ),
     "",
-    "// placeholder — will be overwritten on first `vite dev` run",
-    "export const routeTree = {} as never;",
+    ...routes.map(route =>
+      [
+        `const ${route.importName} = ${route.importName}Import.update({`,
+        `  id: "${route.fileRouteId}",`,
+        route.path ? `  path: "${route.path}",` : undefined,
+        `  getParentRoute: () => ${route.parentRoute},`,
+        "} as any);",
+      ]
+        .filter(Boolean)
+        .join("\n")
+    ),
+    "",
+    "export interface FileRoutesByFullPath {",
+    ...addressableRoutes.map(route => `  "${route.fullPath}": typeof ${route.importName};`),
+    "}",
+    "export interface FileRoutesByTo {",
+    ...addressableRoutes.map(route => `  "${route.fullPath}": typeof ${route.importName};`),
+    "}",
+    "export interface FileRoutesById {",
+    ...fileRouteIdEntries,
+    "}",
+    "export interface FileRouteTypes {",
+    "  fileRoutesByFullPath: FileRoutesByFullPath;",
+    `  fullPaths: ${fullPaths.map(fullPath => `"${fullPath}"`).join(" | ")};`,
+    "  fileRoutesByTo: FileRoutesByTo;",
+    `  to: ${fullPaths.map(fullPath => `"${fullPath}"`).join(" | ")};`,
+    `  id: ${fileRouteTypeIds.join(" | ")};`,
+    "  fileRoutesById: FileRoutesById;",
+    "}",
+    "export interface RootRouteChildren {",
+    ...rootChildren.map(line => `  ${line}`),
+    "}",
+    "",
+    'declare module "@tanstack/react-router" {',
+    "  interface FileRoutesByPath {",
+    ...routes.map(route =>
+      [
+        `    "${route.filePath}": {`,
+        `      id: "${route.filePath}",`,
+        `      path: "${route.fileRoutePath}",`,
+        `      fullPath: "${route.fullPath}",`,
+        `      preLoaderRoute: typeof ${route.importName}Import,`,
+        `      parentRoute: typeof ${route.parentRoute};`,
+        "    };",
+      ].join("\n")
+    ),
+    "  }",
+    "}",
+    "",
+    "interface DashboardRouteChildren {",
+    ...dashboardChildren.map(line => `  ${line}`),
+    "}",
+    "",
+    "const DashboardRouteChildren: DashboardRouteChildren = {",
+    ...dashboardChildRoutes.map(route => `  ${route.importName}: ${route.importName},`),
+    "};",
+    "",
+    "const DashboardRouteWithChildren = DashboardRoute._addFileChildren(DashboardRouteChildren);",
+    "",
+    "const rootRouteChildren: RootRouteChildren = {",
+    "  DashboardRoute: DashboardRouteWithChildren,",
+    ...rootLeafRoutes.map(route => `  ${route.importName}: ${route.importName},`),
+    "};",
+    "",
+    "export const routeTree = rootRouteImport",
+    "  ._addFileChildren(rootRouteChildren)",
+    "  ._addFileTypes<FileRouteTypes>();",
+    "",
+    'import type { getRouter } from "./router.tsx";',
+    'import type { createStart } from "@tanstack/react-start";',
+    "",
+    'declare module "@tanstack/react-start" {',
+    "  interface Register {",
+    "    ssr: true;",
+    "    router: Awaited<ReturnType<typeof getRouter>>;",
+    "  }",
+    "}",
     "",
   ].join("\n");
 }
@@ -1016,6 +1213,7 @@ function buildTestUtilsIndex() {
 function buildRootRoute(context: GenerateContext) {
   return replaceTemplateTokens(
     [
+      '/// <reference types="vite/client" />',
       'import { HeadContent, Outlet, Scripts, createRootRoute } from "@tanstack/react-router";',
       'import type { ReactNode } from "react";',
       'import appCss from "~/src/styles.css?url";',
@@ -1534,7 +1732,7 @@ function buildHealthApiRoute(context: GenerateContext) {
     "      GET: async () => {",
     "        const timestamp = new Date().toISOString();",
     "",
-    "        const checks = {",
+    '        const checks: Record<string, "ok" | "error"> = {',
     '          postgres: "ok",'
   );
 
@@ -1543,7 +1741,7 @@ function buildHealthApiRoute(context: GenerateContext) {
   }
 
   lines.push(
-    '        } satisfies Record<string, "ok" | "error">;',
+    "        };",
     "",
     "        try {",
     "          await checkPostgresReadiness();",

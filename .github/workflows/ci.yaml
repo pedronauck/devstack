@@ -64,3 +64,6 @@ jobs:
 
       - name: Check (format + lint + typecheck + test)
         run: make check
+
+      - name: Validate TanStack scaffold smoke path
+        run: bun run validate:scaffold:tanstack

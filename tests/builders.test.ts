@@ -86,7 +86,18 @@ describe("builders/shared", () => {
     for (const file of pluginFiles) {
       await writeFile(
         path.join(targetDir, file),
-        "dash-react-hooks\ndash-react\ndash-testing\n",
+        [
+          "const plugin = {",
+          '  meta: { name: "dash-react-hooks" },',
+          "  rules: {",
+          '    "dash-react/example": "warn",',
+          '    "dash-testing/example": "warn",',
+          "  },",
+          "};",
+          "",
+          "export default plugin;",
+          "",
+        ].join("\n"),
         "utf8"
       );
     }

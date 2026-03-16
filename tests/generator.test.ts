@@ -1,3 +1,4 @@
+import { spawn } from "node:child_process";
 import { mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -27,6 +28,35 @@ async function scaffoldProject(overrides: Partial<GeneratorConfig> = {}) {
   });
 
   return targetDir;
+}
+
+async function runCommand(command: string, args: string[], cwd: string) {
+  await new Promise<void>((resolve, reject) => {
+    const child = spawn(command, args, {
+      cwd,
+      stdio: "pipe",
+    });
+
+    let output = "";
+    child.stdout.on("data", chunk => {
+      output += String(chunk);
+    });
+    child.stderr.on("data", chunk => {
+      output += String(chunk);
+    });
+
+    child.on("error", reject);
+    child.on("exit", code => {
+      if (code === 0) {
+        resolve();
+        return;
+      }
+
+      reject(
+        new Error(`${command} ${args.join(" ")} failed with code ${code ?? "unknown"}\n${output}`)
+      );
+    });
+  });
 }
 
 async function listRelativeFiles(rootDir: string): Promise<string[]> {
@@ -61,7 +91,8 @@ describe("generateProject", () => {
           "react/SKILL.md",
         ])
       );
-    }
+    },
+    45_000
   );
 
   it.each([["separated" as const], ["tanstack-start" as const]])(
@@ -80,22 +111,68 @@ describe("generateProject", () => {
     const packageJson = JSON.parse(await readFile(path.join(appDir, "package.json"), "utf8"));
     const tsconfig = JSON.parse(await readFile(path.join(appDir, "tsconfig.json"), "utf8"));
     const viteConfig = await readFile(path.join(appDir, "vite.config.ts"), "utf8");
+    const routeTree = await readFile(path.join(appDir, "src/routeTree.gen.ts"), "utf8");
     const testSetup = await readFile(path.join(appDir, "src/test-setup.ts"), "utf8");
+    const rootRoute = await readFile(path.join(appDir, "src/routes/__root.tsx"), "utf8");
 
     expect(packageJson.scripts.dev).toBe("vite dev");
     expect(packageJson.scripts.build).toBe("vite build");
+    expect(packageJson.scripts.typecheck).toBe("bunx tsgo --noEmit");
     expect(packageJson.dependencies.vinxi).toBeUndefined();
+    expect(packageJson.devDependencies["@tanstack/router-cli"]).toBeUndefined();
     expect(packageJson.devDependencies["vite-tsconfig-paths"]).toBe("^6.1.1");
+    expect(tsconfig.compilerOptions.allowImportingTsExtensions).toBe(true);
     expect(tsconfig.compilerOptions.paths).toMatchObject({
       "@/*": ["./src/*"],
       "~/*": ["./*"],
     });
+    expect(tsconfig.compilerOptions.types).toContain("vite/client");
     expect(tsconfig.include).toContain("vite.config.ts");
     expect(viteConfig).toContain("@tanstack/react-start/plugin/vite");
     expect(viteConfig).toContain("tanstackStart({");
+    expect(routeTree).toContain('import { Route as rootRouteImport } from "./routes/__root";');
+    expect(routeTree).toContain(
+      'import { Route as ApiHealthRouteImport } from "./routes/api/health";'
+    );
+    expect(routeTree).toContain('import type { getRouter } from "./router.tsx";');
+    expect(routeTree).toContain('declare module "@tanstack/react-start" {');
     expect(testSetup).toContain('import "@testing-library/jest-dom";');
     expect(testSetup).toContain("window.ResizeObserver = ResizeObserverMock;");
+    expect(rootRoute).toContain('/// <reference types="vite/client" />');
   });
+
+  it("includes generated TanStack route tree entries for optional API routes", async () => {
+    const targetDir = await scaffoldProject({
+      stackModel: "tanstack-start",
+      selectedModules: ["auth", "stripe", "inngest"],
+    });
+    const routeTree = await readFile(
+      path.join(targetDir, "packages/app/src/routeTree.gen.ts"),
+      "utf8"
+    );
+
+    expect(routeTree).toContain(
+      'import { Route as ApiAuthSplatRouteImport } from "./routes/api/auth/$";'
+    );
+    expect(routeTree).toContain(
+      'import { Route as ApiWebhooksStripeRouteImport } from "./routes/api/webhooks/stripe";'
+    );
+    expect(routeTree).toContain(
+      'import { Route as ApiInngestRouteImport } from "./routes/api/inngest";'
+    );
+    expect(routeTree).toContain('"/api/auth/$": typeof ApiAuthSplatRoute;');
+    expect(routeTree).toContain('"/api/webhooks/stripe": typeof ApiWebhooksStripeRoute;');
+    expect(routeTree).toContain('"/api/inngest": typeof ApiInngestRoute;');
+  });
+
+  it.each([["separated" as const], ["tanstack-start" as const]])(
+    "generates scaffold output that already passes oxfmt check for %s",
+    async stackModel => {
+      const targetDir = await scaffoldProject({ stackModel });
+
+      await runCommand("bunx", ["oxfmt", "--check", "."], targetDir);
+    }
+  );
 
   it("includes Redis rate limit env vars in the TanStack Start schema and env example", async () => {
     const targetDir = await scaffoldProject({
@@ -161,6 +238,7 @@ describe("generateProject", () => {
     expect(requestContextLib).toContain('export const REQUEST_ID_HEADER = "X-Request-Id"');
     expect(healthRoute).toContain("checkPostgresReadiness");
     expect(healthRoute).toContain("checkRedisReadiness");
+    expect(healthRoute).toContain('const checks: Record<string, "ok" | "error"> = {');
     expect(tracingLib).toContain("NodeSDK");
     expect(tracingLib).not.toContain("Add OpenTelemetry SDK initialization here");
     expect(sentryLib).toContain("Sentry.init");
@@ -202,7 +280,8 @@ describe("generateProject", () => {
       await expect(readFile(path.join(targetDir, "docker-compose.yml"), "utf8")).resolves.toContain(
         "redis:"
       );
-    }
+    },
+    45_000
   );
 
   it("rejects non-empty target directories before scaffolding", async () => {

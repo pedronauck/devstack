@@ -26,10 +26,12 @@
         "lint:fix": "bunx oxlint --fix src tests bin vitest.config.ts",
         "test": "bunx vitest run --config vitest.config.ts",
         "test:coverage": "bunx vitest run --config vitest.config.ts --coverage",
+        "validate:scaffold:tanstack": "bun run ./bin/validate-tanstack-scaffold.ts",
         "typecheck": "tsc --noEmit"
     },
     "dependencies": {
         "@clack/prompts": "^1.1.0",
+        "oxfmt": "^0.40.0",
         "picocolors": "^1.1.1"
     },
     "devDependencies": {
@@ -39,7 +41,6 @@
         "@vitest/coverage-v8": "4.1.0",
         "husky": "^9.1.7",
         "lint-staged": "^16.3.3",
-        "oxfmt": "^0.40.0",
         "oxlint": "^1.55.0",
         "typescript": "^5.9.3",
         "vitest": "^4.1.0"
