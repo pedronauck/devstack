@@ -2,7 +2,7 @@ Goal (incl. success criteria):
 
 - Fix the TanStack Start scaffold so newly generated projects pass formatting and typecheck without manual cleanup.
 - Add repository-side validation that catches scaffold regressions before release.
-- Success means: generated TanStack app no longer emits the observed `.ts` import, router generation, CSS asset typing, health-route typing, or formatting failures; repo tests cover these regressions; and a heavier scaffold smoke validator exists for local/CI use.
+- Success means: generated TanStack app no longer emits the observed `.ts` import, router generation, CSS asset typing, health-route typing, hydration/root-document, or formatting failures; repo tests cover these regressions; and a heavier scaffold smoke validator exists for local/CI use.
 
 Constraints/Assumptions:
 
@@ -42,6 +42,8 @@ Done:
 - Fixed the separated email module template to use a `.tsx` file for JSX-based email rendering so generator-side formatting remains strict without false parse failures.
 - Added a generated-project TanStack smoke validator and wired it into CI.
 - `bunx vitest run tests/generator.test.ts`, `bun run validate:scaffold:tanstack`, and `make check` all passed.
+- Fixed the TanStack root route scaffold so `shellComponent: RootDocument` is not nested inside `component: RootComponent`, eliminating duplicate `<html>/<body>` markup during hydration.
+- Added an inline favicon to the generated TanStack root route so fresh projects do not 404 on `/favicon.ico`.
 
 Now:
 

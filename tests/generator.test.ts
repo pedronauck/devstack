@@ -139,6 +139,11 @@ describe("generateProject", () => {
     expect(testSetup).toContain('import "@testing-library/jest-dom";');
     expect(testSetup).toContain("window.ResizeObserver = ResizeObserverMock;");
     expect(rootRoute).toContain('/// <reference types="vite/client" />');
+    expect(rootRoute).toContain("const faviconHref =");
+    expect(rootRoute).toContain("data:image/svg+xml,");
+    expect(rootRoute).toContain('{ rel: "icon", href: faviconHref, type: "image/svg+xml" }');
+    expect(rootRoute).toContain("  return <Outlet />;");
+    expect(rootRoute).not.toContain("<RootDocument>");
   });
 
   it("includes generated TanStack route tree entries for optional API routes", async () => {
