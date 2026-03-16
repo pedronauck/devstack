@@ -3,7 +3,6 @@ import path from "node:path";
 import { MODULE_REGISTRY } from "../modules/index.ts";
 import {
   copyDirectoryWithTemplates as copyDirectory,
-  copySelectedSubdirectories,
   ensureDir,
   pathExists,
   writeTextFile,
@@ -19,16 +18,19 @@ import {
   buildGitignore,
   buildInitTestDbScript,
   buildMakefile,
+  copySkillsToAgentDirs,
   patchPluginNames,
   resolveSkillsForModules,
   SKILLS_DIR,
   TEMPLATES_DIR,
   toJson,
+  writeInstructionFiles,
 } from "./shared.ts";
 import type { GenerateContext } from "./types.ts";
 
 const BASE_ROOT_DIR = path.join(TEMPLATES_DIR, "base", "root");
 const BASE_FRONTEND_DIR = path.join(TEMPLATES_DIR, "base", "frontend");
+const BASE_BACKEND_DIR = path.join(TEMPLATES_DIR, "base", "backend");
 
 // ---------------------------------------------------------------------------
 // Public API
@@ -81,6 +83,35 @@ async function copyFrontendSharedAssets(context: GenerateContext) {
   }
 }
 
+async function copyBackendSharedAssets(context: GenerateContext) {
+  const fileMappings = new Map<string, string>([
+    ["src/lib/errors.ts", "server/lib/errors.ts"],
+    ["src/lib/id.ts", "server/lib/id.ts"],
+    ["src/lib/lazy.ts", "server/lib/lazy.ts"],
+    ["src/lib/logger.ts", "server/lib/logger.ts"],
+    ["src/lib/pagination.ts", "server/lib/pagination.ts"],
+    ["src/lib/response.ts", "server/lib/response.ts"],
+    ["src/test-utils/db.ts", "server/test-utils/db.ts"],
+    ["src/test-utils/request.ts", "server/test-utils/request.ts"],
+  ]);
+
+  await Promise.all(
+    Array.from(fileMappings.entries()).map(async ([sourcePath, targetPath]) => {
+      const absoluteSourcePath = path.join(BASE_BACKEND_DIR, sourcePath);
+
+      if (!(await pathExists(absoluteSourcePath))) {
+        return;
+      }
+
+      const content = await readFile(absoluteSourcePath, "utf8");
+      await writeTextFile(
+        path.join(context.targetDir, "packages/app", targetPath),
+        replaceTemplateTokens(content, context.tokens)
+      );
+    })
+  );
+}
+
 async function copyModuleSkills(context: GenerateContext) {
   if (!(await pathExists(SKILLS_DIR))) {
     throw new Error(
@@ -88,12 +119,12 @@ async function copyModuleSkills(context: GenerateContext) {
     );
   }
   const selectedSkills = resolveSkillsForModules(context.resolvedModules, context.stackModel);
-  await copySelectedSubdirectories(
-    SKILLS_DIR,
-    path.join(context.targetDir, ".claude/skills"),
-    selectedSkills,
-    context.tokens
-  );
+
+  if (selectedSkills.size === 0) {
+    return;
+  }
+
+  await copySkillsToAgentDirs(context.targetDir, selectedSkills, context);
 }
 
 // ---------------------------------------------------------------------------
@@ -105,6 +136,7 @@ async function writeSharedDynamicFiles(context: GenerateContext) {
   await ensureDir(path.join(context.targetDir, ".husky"));
   await ensureDir(path.join(context.targetDir, "docker/postgres"));
   await ensureDir(path.join(context.targetDir, ".claude"));
+  await ensureDir(path.join(context.targetDir, ".agents"));
 
   await patchPluginNames(context);
 
@@ -137,7 +169,7 @@ async function writeSharedDynamicFiles(context: GenerateContext) {
     path.join(context.targetDir, "docker/postgres/init-test-db.sh"),
     buildInitTestDbScript(context)
   );
-  await writeTextFile(path.join(context.targetDir, "CLAUDE.md"), buildClaudeMd(context, builder));
+  await writeInstructionFiles(context.targetDir, buildClaudeMd(context, builder));
   await writeTextFile(path.join(context.targetDir, ".claude/settings.json"), buildClaudeSettings());
   await writeTextFile(path.join(context.targetDir, ".github/workflows/ci.yaml"), buildCiWorkflow());
   await writeTextFile(
@@ -168,7 +200,7 @@ async function writeAppDynamicFiles(context: GenerateContext) {
 
   // Entry points
   await writeTextFile(path.join(appDir, "src/client.tsx"), buildClientEntry());
-  await writeTextFile(path.join(appDir, "src/server.ts"), buildServerEntry());
+  await writeTextFile(path.join(appDir, "src/server.ts"), buildServerEntry(context));
   await writeTextFile(path.join(appDir, "src/router.tsx"), buildRouterEntry());
   await writeTextFile(path.join(appDir, "src/routeTree.gen.ts"), buildRouteTreeStub());
 
@@ -202,6 +234,7 @@ async function writeServerFiles(context: GenerateContext) {
   await ensureDir(path.join(serverDir, "db/schema"));
   await ensureDir(path.join(serverDir, "lib"));
   await ensureDir(path.join(serverDir, "functions"));
+  await copyBackendSharedAssets(context);
 
   // API route for health
   await ensureDir(path.join(context.targetDir, "packages/app/src/routes/api"));
@@ -217,8 +250,9 @@ async function writeServerFiles(context: GenerateContext) {
 
   // Lib
   await writeTextFile(path.join(serverDir, "lib/env.ts"), buildEnvTs(context));
-  await writeTextFile(path.join(serverDir, "lib/errors.ts"), buildErrors());
-  await writeTextFile(path.join(serverDir, "lib/id.ts"), buildId());
+  await writeTextFile(path.join(serverDir, "lib/request-context.ts"), buildRequestContextLib());
+  await writeTextFile(path.join(serverDir, "test-utils/factories.ts"), buildTestItemFactory());
+  await writeTextFile(path.join(serverDir, "test-utils/index.ts"), buildTestUtilsIndex());
 
   // Server functions
   await writeTextFile(path.join(serverDir, "functions/items.ts"), buildItemsFunctions());
@@ -298,7 +332,7 @@ async function writeModuleFiles(context: GenerateContext) {
   }
 
   if (context.resolvedModules.includes("observability")) {
-    await writeTextFile(path.join(appDir, "server/lib/tracing.ts"), buildTracingLib());
+    await writeTextFile(path.join(appDir, "server/lib/tracing.ts"), buildTracingLib(context));
     await writeTextFile(path.join(appDir, "server/lib/sentry.ts"), buildSentryLib());
   }
 
@@ -611,6 +645,8 @@ function buildAppPackageJson(context: GenerateContext): PackageJsonShape {
       "@fontsource-variable/geist": "^5.2.8",
       "@fontsource/bricolage-grotesque": "^5.2.10",
       "@hookform/resolvers": "^5.2.2",
+      "@logtape/logtape": "^2.0.4",
+      "@opentelemetry/api": "^1.9.0",
       "@tabler/icons-react": "^3.40.0",
       "@tanstack/react-query": "^5.90.21",
       "@tanstack/react-query-devtools": "^5.91.3",
@@ -780,17 +816,101 @@ function buildClientEntry() {
   ].join("\n");
 }
 
-function buildServerEntry() {
-  return [
+function buildServerEntry(context: GenerateContext) {
+  const lines = [
+    'import { withContext } from "@logtape/logtape";',
     'import handler, { createServerEntry } from "@tanstack/react-start/server-entry";',
+    'import { configureBackendLogger, logger } from "~/server/lib/logger.ts";',
+    'import { REQUEST_ID_HEADER, resolveRequestId } from "~/server/lib/request-context.ts";',
+  ];
+
+  if (context.resolvedModules.includes("observability")) {
+    lines.push(
+      'import { initializeSentry } from "~/server/lib/sentry.ts";',
+      'import { initializeTracing, shutdownTracing } from "~/server/lib/tracing.ts";'
+    );
+  }
+
+  lines.push("", "configureBackendLogger();", "");
+
+  if (context.resolvedModules.includes("observability")) {
+    lines.push(
+      "let shutdownHandlersRegistered = false;",
+      "const startup = initializeServerRuntime();",
+      "",
+      "async function initializeServerRuntime() {",
+      "  initializeSentry();",
+      "  await initializeTracing();",
+      "  registerShutdownHandlers();",
+      "}",
+      "",
+      "function registerShutdownHandlers() {",
+      '  if (shutdownHandlersRegistered || process.env.NODE_ENV === "test") {',
+      "    return;",
+      "  }",
+      "",
+      "  shutdownHandlersRegistered = true;",
+      '  for (const signal of ["SIGINT", "SIGTERM"] as const) {',
+      "    process.once(signal, () => {",
+      "      void shutdownTracing();",
+      "    });",
+      "  }",
+      "}",
+      ""
+    );
+  } else {
+    lines.push("const startup = Promise.resolve();", "");
+  }
+
+  lines.push(
+    "function withRequestIdHeader(response: Response, requestId: string) {",
+    "  const headers = new Headers(response.headers);",
+    "  headers.set(REQUEST_ID_HEADER, requestId);",
+    "  return new Response(response.body, {",
+    "    status: response.status,",
+    "    statusText: response.statusText,",
+    "    headers,",
+    "  });",
+    "}",
     "",
     "export default createServerEntry({",
-    "  fetch(request) {",
-    "    return handler.fetch(request);",
+    "  async fetch(request) {",
+    "    await startup;",
+    "",
+    '    const requestId = resolveRequestId(request.headers.get("x-request-id"));',
+    "    const requestUrl = new URL(request.url);",
+    "    const startedAt = performance.now();",
+    "",
+    "    return withContext({ requestId }, async () => {",
+    "      try {",
+    "        const response = await handler.fetch(request);",
+    "        const responseWithHeaders = withRequestIdHeader(response, requestId);",
+    "",
+    '        logger.info("HTTP request completed", {',
+    "          durationMs: Number((performance.now() - startedAt).toFixed(3)),",
+    "          method: request.method,",
+    "          path: requestUrl.pathname,",
+    "          requestId,",
+    "          statusCode: responseWithHeaders.status,",
+    "        });",
+    "",
+    "        return responseWithHeaders;",
+    "      } catch (error) {",
+    '        logger.error("HTTP request failed", {',
+    "          error,",
+    "          method: request.method,",
+    "          path: requestUrl.pathname,",
+    "          requestId,",
+    "        });",
+    "        throw error;",
+    "      }",
+    "    });",
     "  },",
     "});",
-    "",
-  ].join("\n");
+    ""
+  );
+
+  return lines.join("\n");
 }
 
 function buildRouterEntry() {
@@ -835,6 +955,52 @@ function buildRouteTreeStub() {
     "",
     "// placeholder — will be overwritten on first `vinxi dev` run",
     "export const routeTree = {} as never;",
+    "",
+  ].join("\n");
+}
+
+function buildRequestContextLib() {
+  return [
+    'export const REQUEST_ID_HEADER = "X-Request-Id";',
+    "",
+    "export function resolveRequestId(headerValue: string | null | undefined) {",
+    "  const trimmedValue = headerValue?.trim();",
+    "",
+    "  if (trimmedValue) {",
+    "    return trimmedValue;",
+    "  }",
+    "",
+    "  return crypto.randomUUID();",
+    "}",
+    "",
+  ].join("\n");
+}
+
+function buildTestItemFactory() {
+  return [
+    'import { toMerged } from "es-toolkit/object";',
+    'import { items } from "~/server/db/schema/index.ts";',
+    "",
+    "type NewItem = typeof items.$inferInsert;",
+    "",
+    "export function createTestItem(overrides: Partial<NewItem> = {}): NewItem {",
+    "  return toMerged(",
+    "    {",
+    '      name: "Test Item",',
+    "      description: null,",
+    "    } satisfies NewItem,",
+    "    overrides",
+    "  );",
+    "}",
+    "",
+  ].join("\n");
+}
+
+function buildTestUtilsIndex() {
+  return [
+    'export { getTestDb, setupTestDatabase, teardownTestDatabase, withTestTransaction } from "./db.ts";',
+    'export { createTestItem } from "./factories.ts";',
+    'export { testRequest } from "./request.ts";',
     "",
   ].join("\n");
 }
@@ -1167,8 +1333,11 @@ function buildDbIndex() {
     'import * as schema from "./schema/index.ts";',
     "",
     "const connectionString = process.env.DATABASE_URL!;",
-    "const client = postgres(connectionString);",
+    "const client = postgres(connectionString, {",
+    "  onnotice: () => {},",
+    "});",
     "export const db = drizzle(client, { schema });",
+    "export type Database = typeof db;",
     "",
   ].join("\n");
 }
@@ -1202,8 +1371,12 @@ function buildItemsSchema() {
 function buildEnvTs(context: GenerateContext) {
   const fields: string[] = [
     "  DATABASE_URL: z.string().url(),",
+    "  DATABASE_URL_TEST: z.string().url().optional(),",
     '  NODE_ENV: z.enum(["development", "production", "test"]).default("development"),',
     "  PORT: z.coerce.number().default(3000),",
+    '  APP_URL: z.string().url().default("http://localhost:3000"),',
+    '  LOG_FORMAT: z.enum(["json", "text"]).optional(),',
+    '  LOG_LEVEL: z.enum(["debug", "error", "info"]).optional(),',
   ];
 
   if (context.resolvedModules.includes("auth")) {
@@ -1231,6 +1404,19 @@ function buildEnvTs(context: GenerateContext) {
   }
   if (context.resolvedModules.includes("observability")) {
     fields.push("  SENTRY_DSN: z.string().url().optional(),");
+    fields.push("  SENTRY_ENVIRONMENT: z.string().optional(),");
+    fields.push("  SENTRY_RELEASE: z.string().optional(),");
+    fields.push("  SENTRY_TRACES_SAMPLE_RATE: z.string().optional(),");
+    fields.push('  TRACING_ENABLED: z.enum(["0", "1"]).optional(),');
+    fields.push('  OTEL_TRACES_ENABLED: z.enum(["0", "1"]).optional(),');
+    fields.push("  OTEL_EXPORTER_OTLP_ENDPOINT: z.string().url().optional(),");
+    fields.push("  OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: z.string().url().optional(),");
+    fields.push("  OTEL_SERVICE_NAME: z.string().optional(),");
+    fields.push("  OTEL_SERVICE_VERSION: z.string().optional(),");
+  }
+  if (context.resolvedModules.includes("inngest")) {
+    fields.push("  INNGEST_BASE_URL: z.string().url().optional(),");
+    fields.push('  INNGEST_DEV: z.enum(["0", "1"]).optional(),');
   }
   if (context.resolvedModules.includes("redis")) {
     fields.push('  REDIS_URL: z.string().default("redis://localhost:6379"),');
@@ -1250,51 +1436,6 @@ function buildEnvTs(context: GenerateContext) {
     "});",
     "",
     "export const env = envSchema.parse(process.env);",
-    "",
-  ].join("\n");
-}
-
-function buildErrors() {
-  return [
-    "export class AppError extends Error {",
-    "  constructor(",
-    "    message: string,",
-    "    public readonly statusCode: number = 500,",
-    "    public readonly code?: string,",
-    "  ) {",
-    "    super(message);",
-    '    this.name = "AppError";',
-    "  }",
-    "}",
-    "",
-    "export class NotFoundError extends AppError {",
-    '  constructor(message = "Not found") {',
-    '    super(message, 404, "NOT_FOUND");',
-    "  }",
-    "}",
-    "",
-    "export class ValidationError extends AppError {",
-    '  constructor(message = "Validation failed") {',
-    '    super(message, 400, "VALIDATION_ERROR");',
-    "  }",
-    "}",
-    "",
-    "export class UnauthorizedError extends AppError {",
-    '  constructor(message = "Unauthorized") {',
-    '    super(message, 401, "UNAUTHORIZED");',
-    "  }",
-    "}",
-    "",
-  ].join("\n");
-}
-
-function buildId() {
-  return [
-    'import { v7 as uuidv7 } from "uuid";',
-    "",
-    "export function generateId(): string {",
-    "  return uuidv7();",
-    "}",
     "",
   ].join("\n");
 }
@@ -1328,28 +1469,136 @@ function buildItemsFunctions() {
 }
 
 function buildHealthApiRoute(context: GenerateContext) {
-  return replaceTemplateTokens(
-    [
-      'import { createFileRoute } from "@tanstack/react-router";',
-      "",
-      'export const Route = createFileRoute("/api/health")({',
-      "  handler: async () => {",
-      "    return Response.json({",
-      '      status: "ok",',
-      "      timestamp: new Date().toISOString(),",
-      "    });",
-      "  },",
-      "});",
-      "",
-    ].join("\n"),
-    context.tokens
+  const lines = [
+    'import { sql } from "drizzle-orm";',
+    'import { createFileRoute } from "@tanstack/react-router";',
+    'import { db } from "~/server/db/index.ts";',
+  ];
+
+  if (context.resolvedModules.includes("redis")) {
+    lines.push('import { getRedisClient } from "~/server/lib/redis.ts";');
+  }
+
+  lines.push(
+    "",
+    "const READINESS_TIMEOUT_MS = 5_000;",
+    "",
+    "function withReadinessTimeout<T>(label: string, task: () => Promise<T>) {",
+    "  let timeoutId: ReturnType<typeof setTimeout> | undefined;",
+    "",
+    "  const timeoutPromise = new Promise<never>((_, reject) => {",
+    "    timeoutId = setTimeout(() => {",
+    "      reject(new Error(`${label} readiness check timed out after ${READINESS_TIMEOUT_MS}ms`));",
+    "    }, READINESS_TIMEOUT_MS);",
+    "",
+    "    timeoutId.unref?.();",
+    "  });",
+    "",
+    "  return Promise.race([task(), timeoutPromise]).finally(() => {",
+    "    if (timeoutId) {",
+    "      clearTimeout(timeoutId);",
+    "    }",
+    "  });",
+    "}",
+    "",
+    "async function checkPostgresReadiness() {",
+    '  await withReadinessTimeout("postgres", async () => {',
+    "    await db.execute(sql`select 1`);",
+    "  });",
+    "}",
+    ""
   );
+
+  if (context.resolvedModules.includes("redis")) {
+    lines.push(
+      "async function checkRedisReadiness() {",
+      '  await withReadinessTimeout("redis", async () => {',
+      "    const pong = await getRedisClient().ping();",
+      '    if (pong !== "PONG") {',
+      '      throw new Error("Redis did not respond with PONG");',
+      "    }",
+      "  });",
+      "}",
+      ""
+    );
+  }
+
+  lines.push(
+    'export const Route = createFileRoute("/api/health")({',
+    "  server: {",
+    "    handlers: {",
+    "      GET: async () => {",
+    "        const timestamp = new Date().toISOString();",
+    "",
+    "        const checks = {",
+    '          postgres: "ok",'
+  );
+
+  if (context.resolvedModules.includes("redis")) {
+    lines.push('          redis: "ok",');
+  }
+
+  lines.push(
+    '        } satisfies Record<string, "ok" | "error">;',
+    "",
+    "        try {",
+    "          await checkPostgresReadiness();",
+    "        } catch {",
+    '          checks.postgres = "error";',
+    "        }",
+    ""
+  );
+
+  if (context.resolvedModules.includes("redis")) {
+    lines.push(
+      "        try {",
+      "          await checkRedisReadiness();",
+      "        } catch {",
+      '          checks.redis = "error";',
+      "        }",
+      ""
+    );
+  }
+
+  lines.push(
+    '        if (Object.values(checks).every(status => status === "ok")) {',
+    "          return Response.json({",
+    '            status: "ready",',
+    "            checks,",
+    "            timestamp,",
+    "          });",
+    "        }",
+    "",
+    "        return Response.json(",
+    "          {",
+    '            status: "not_ready",',
+    "            checks,",
+    "            timestamp,",
+    "          },",
+    "          { status: 503 }",
+    "        );",
+    "      },",
+    "    },",
+    "  },",
+    "});",
+    ""
+  );
+
+  return replaceTemplateTokens(lines.join("\n"), context.tokens);
 }
 
 function buildEnvExample(context: GenerateContext) {
   const lines = [
+    "# App",
+    "APP_URL=http://localhost:3000",
+    "PORT=3000",
+    "NODE_ENV=development",
+    "LOG_FORMAT=text",
+    "LOG_LEVEL=info",
+    "",
     "# Database",
     `DATABASE_URL=postgresql://postgres:postgres@localhost:5432/${context.projectName}`,
+    `DATABASE_URL_TEST=postgresql://postgres:postgres@localhost:5432/${context.projectName}_test`,
     "",
   ];
 
@@ -1379,10 +1628,29 @@ function buildEnvExample(context: GenerateContext) {
     lines.push("# Email", "RESEND_API_KEY=re_...", "EMAIL_FROM=noreply@example.com", "");
   }
   if (context.resolvedModules.includes("inngest")) {
-    lines.push("# Inngest", "INNGEST_EVENT_KEY=", "INNGEST_SIGNING_KEY=", "");
+    lines.push(
+      "# Inngest",
+      "INNGEST_EVENT_KEY=",
+      "INNGEST_SIGNING_KEY=",
+      "INNGEST_BASE_URL=http://localhost:8288",
+      "INNGEST_DEV=1",
+      ""
+    );
   }
   if (context.resolvedModules.includes("observability")) {
-    lines.push("# Observability", "SENTRY_DSN=", "");
+    lines.push(
+      "# Observability",
+      "SENTRY_DSN=",
+      "SENTRY_ENVIRONMENT=development",
+      "SENTRY_RELEASE=",
+      "SENTRY_TRACES_SAMPLE_RATE=0.1",
+      "TRACING_ENABLED=0",
+      "OTEL_TRACES_ENABLED=0",
+      "OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317",
+      `OTEL_SERVICE_NAME=${context.projectName}-backend`,
+      "OTEL_SERVICE_VERSION=",
+      ""
+    );
   }
   if (context.resolvedModules.includes("redis")) {
     lines.push(
@@ -1796,33 +2064,192 @@ function buildInngestApiRoute() {
 // Module: Observability
 // ---------------------------------------------------------------------------
 
-function buildTracingLib() {
-  return [
-    "// OpenTelemetry tracing setup",
-    "// Initialize in server.ts or app.config.ts",
-    "",
-    "export function initializeTracing() {",
-    "  // Add OpenTelemetry SDK initialization here",
-    "}",
-    "",
-    "export function shutdownTracing() {",
-    "  // Add graceful shutdown here",
-    "}",
-    "",
-  ].join("\n");
+function buildTracingLib(context: GenerateContext) {
+  return replaceTemplateTokens(
+    [
+      'import { trace } from "@opentelemetry/api";',
+      'import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-grpc";',
+      'import { HttpInstrumentation } from "@opentelemetry/instrumentation-http";',
+      'import { resourceFromAttributes } from "@opentelemetry/resources";',
+      'import { NodeSDK } from "@opentelemetry/sdk-node";',
+      'import { BatchSpanProcessor, SimpleSpanProcessor, type SpanExporter, type SpanProcessor } from "@opentelemetry/sdk-trace-base";',
+      'import { z } from "zod";',
+      "",
+      'const DEFAULT_OTEL_EXPORTER_URL = "http://localhost:4317";',
+      'const DEFAULT_SERVICE_NAME = "{{projectName}}-backend";',
+      'const TRACER_NAME = "{{projectName}}-backend";',
+      "",
+      "const tracingEnvironmentSchema = z.object({",
+      "  NODE_ENV: z.string().trim().min(1).optional(),",
+      "  OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: z.string().trim().url().optional(),",
+      "  OTEL_EXPORTER_OTLP_ENDPOINT: z.string().trim().url().optional(),",
+      "  OTEL_SERVICE_NAME: z.string().trim().min(1).optional(),",
+      "  OTEL_SERVICE_VERSION: z.string().trim().min(1).optional(),",
+      '  OTEL_TRACES_ENABLED: z.enum(["0", "1"]).optional(),',
+      '  TRACING_ENABLED: z.enum(["0", "1"]).optional(),',
+      "  SENTRY_RELEASE: z.string().trim().min(1).optional(),",
+      "});",
+      "",
+      "type TracingRawEnv = Record<string, string | undefined>;",
+      "",
+      "export interface TracingEnvironment {",
+      "  enabled: boolean;",
+      "  environment: string;",
+      "  exporterUrl: string;",
+      "  serviceName: string;",
+      "  serviceVersion?: string;",
+      "}",
+      "",
+      "interface CreateTracingSdkOptions {",
+      "  rawEnv?: TracingRawEnv;",
+      "  spanProcessors?: SpanProcessor[];",
+      "  traceExporter?: SpanExporter;",
+      "}",
+      "",
+      "let tracingSdk: NodeSDK | null = null;",
+      "",
+      "function getEnvironmentName(rawValue: string | undefined) {",
+      '  return rawValue || "development";',
+      "}",
+      "",
+      "export function getTracer() {",
+      "  return trace.getTracer(TRACER_NAME);",
+      "}",
+      "",
+      "export function resolveTracingEnvironment(rawEnv: TracingRawEnv = process.env): TracingEnvironment {",
+      "  const parsedEnv = tracingEnvironmentSchema.parse(rawEnv);",
+      "  const environment = getEnvironmentName(parsedEnv.NODE_ENV);",
+      "",
+      "  return {",
+      "    enabled:",
+      '      parsedEnv.TRACING_ENABLED !== "0" &&',
+      '      parsedEnv.OTEL_TRACES_ENABLED !== "0" &&',
+      '      environment !== "test",',
+      "    environment,",
+      "    exporterUrl:",
+      "      parsedEnv.OTEL_EXPORTER_OTLP_TRACES_ENDPOINT ??",
+      "      parsedEnv.OTEL_EXPORTER_OTLP_ENDPOINT ??",
+      "      DEFAULT_OTEL_EXPORTER_URL,",
+      "    serviceName: parsedEnv.OTEL_SERVICE_NAME ?? DEFAULT_SERVICE_NAME,",
+      "    serviceVersion: parsedEnv.OTEL_SERVICE_VERSION ?? parsedEnv.SENTRY_RELEASE,",
+      "  };",
+      "}",
+      "",
+      "export function createTracingSdk(options: CreateTracingSdkOptions = {}) {",
+      "  const environment = resolveTracingEnvironment(options.rawEnv);",
+      "  const traceExporter =",
+      "    options.traceExporter ??",
+      "    new OTLPTraceExporter({",
+      "      url: environment.exporterUrl,",
+      "    });",
+      "  const spanProcessors = options.spanProcessors ?? [",
+      "    options.traceExporter",
+      "      ? new SimpleSpanProcessor(traceExporter)",
+      "      : new BatchSpanProcessor(traceExporter),",
+      "  ];",
+      "",
+      "  return new NodeSDK({",
+      "    autoDetectResources: false,",
+      "    resource: resourceFromAttributes({",
+      '      "deployment.environment.name": environment.environment,',
+      '      "service.name": environment.serviceName,',
+      "      ...(environment.serviceVersion",
+      "        ? {",
+      '            "service.version": environment.serviceVersion,',
+      "          }",
+      "        : {}),",
+      "    }),",
+      "    spanProcessors,",
+      "    instrumentations: [new HttpInstrumentation()],",
+      "  });",
+      "}",
+      "",
+      "export async function initializeTracing(",
+      "  rawEnv: TracingRawEnv = process.env,",
+      '  options: Omit<CreateTracingSdkOptions, "rawEnv"> = {}',
+      ") {",
+      "  const environment = resolveTracingEnvironment(rawEnv);",
+      "",
+      "  if (!environment.enabled) {",
+      "    return false;",
+      "  }",
+      "",
+      "  if (tracingSdk) {",
+      "    return true;",
+      "  }",
+      "",
+      "  tracingSdk = createTracingSdk({",
+      "    ...options,",
+      "    rawEnv,",
+      "  });",
+      "  await tracingSdk.start();",
+      "  return true;",
+      "}",
+      "",
+      "export async function shutdownTracing() {",
+      "  if (!tracingSdk) {",
+      "    return;",
+      "  }",
+      "",
+      "  const sdk = tracingSdk;",
+      "  tracingSdk = null;",
+      "  await sdk.shutdown();",
+      "}",
+      "",
+      "export async function shutdownTracingForTests() {",
+      "  await shutdownTracing();",
+      "}",
+      "",
+    ].join("\n"),
+    context.tokens
+  );
 }
 
 function buildSentryLib() {
   return [
-    "// Sentry error tracking setup",
+    'import * as Sentry from "@sentry/bun";',
     "",
-    "export function initializeSentry() {",
-    "  const dsn = process.env.SENTRY_DSN;",
-    "  if (!dsn) return;",
+    "interface SentryRawEnv {",
+    "  NODE_ENV?: string;",
+    "  SENTRY_DSN?: string;",
+    "  SENTRY_ENVIRONMENT?: string;",
+    "  SENTRY_RELEASE?: string;",
+    "  SENTRY_TRACES_SAMPLE_RATE?: string;",
+    "}",
     "",
-    "  // Add Sentry initialization here",
-    "  // import * as Sentry from '@sentry/node';",
-    "  // Sentry.init({ dsn });",
+    "let isSentryInitialized = false;",
+    "",
+    "function parseTracesSampleRate(rawValue: string | undefined) {",
+    "  if (!rawValue) {",
+    "    return 0.1;",
+    "  }",
+    "",
+    "  const parsedValue = Number(rawValue);",
+    "",
+    "  return Number.isFinite(parsedValue) && parsedValue >= 0 && parsedValue <= 1 ? parsedValue : 0.1;",
+    "}",
+    "",
+    "export function initializeSentry(rawEnv: SentryRawEnv = process.env) {",
+    "  const dsn = rawEnv.SENTRY_DSN?.trim();",
+    "",
+    "  if (!dsn || isSentryInitialized) {",
+    "    return Boolean(dsn);",
+    "  }",
+    "",
+    "  Sentry.init({",
+    "    dsn,",
+    "    enabled: true,",
+    '    environment: rawEnv.SENTRY_ENVIRONMENT ?? rawEnv.NODE_ENV ?? "development",',
+    "    release: rawEnv.SENTRY_RELEASE,",
+    "    tracesSampleRate: parseTracesSampleRate(rawEnv.SENTRY_TRACES_SAMPLE_RATE),",
+    "  });",
+    "",
+    "  isSentryInitialized = true;",
+    "  return true;",
+    "}",
+    "",
+    "export function resetSentryForTests() {",
+    "  isSentryInitialized = false;",
     "}",
     "",
   ].join("\n");
@@ -1834,12 +2261,126 @@ function buildSentryLib() {
 
 function buildRedisClient() {
   return [
-    "export function getRedisClient() {",
-    '  const url = process.env.REDIS_URL ?? "redis://localhost:6379";',
-    "  // Use your preferred Redis client here",
-    "  // import { createClient } from 'redis';",
-    "  // return createClient({ url });",
-    "  return { url };",
+    'import type { RedisClient as RateLimitRedisClient } from "@hono-rate-limiter/redis";',
+    'import { z } from "zod";',
+    "",
+    'const DEFAULT_REDIS_URL = "redis://localhost:6379";',
+    "",
+    "const redisEnvironmentSchema = z.object({",
+    "  REDIS_URL: z.string().trim().min(1).optional(),",
+    "});",
+    "",
+    "type RedisRawEnv = Record<string, string | undefined>;",
+    'type BunRedisClient = import("bun").RedisClient;',
+    'type BunRedisConstructor = typeof import("bun").RedisClient;',
+    "",
+    "export interface RedisEnvironment {",
+    "  url: string;",
+    "}",
+    "",
+    "let sharedRedisClient: BunRedisClient | null = null;",
+    "let sharedRedisUrl: string | null = null;",
+    "",
+    "export function hasBunRedisClient() {",
+    "  const bun = globalThis as typeof globalThis & {",
+    "    Bun?: {",
+    "      RedisClient?: BunRedisConstructor;",
+    "    };",
+    "  };",
+    "",
+    '  return typeof bun.Bun?.RedisClient === "function";',
+    "}",
+    "",
+    "function stringifyRedisArgument(value: unknown): string {",
+    '  if (typeof value === "string") {',
+    "    return value;",
+    "  }",
+    "",
+    '  if (typeof value === "number" || typeof value === "bigint" || typeof value === "boolean") {',
+    "    return String(value);",
+    "  }",
+    "",
+    '  throw new TypeError("Redis command arguments must be strings, numbers, bigints, or booleans");',
+    "}",
+    "",
+    "export function resolveRedisEnvironment(rawEnv: RedisRawEnv = process.env): RedisEnvironment {",
+    "  const parsedEnv = redisEnvironmentSchema.parse(rawEnv);",
+    "",
+    "  return {",
+    "    url: parsedEnv.REDIS_URL ?? DEFAULT_REDIS_URL,",
+    "  };",
+    "}",
+    "",
+    "export function createRedisClient(rawEnv: RedisRawEnv = process.env): BunRedisClient {",
+    "  const { url } = resolveRedisEnvironment(rawEnv);",
+    "  const bun = globalThis as typeof globalThis & {",
+    "    Bun?: {",
+    "      RedisClient?: BunRedisConstructor;",
+    "    };",
+    "  };",
+    "  const RedisClient = bun.Bun?.RedisClient;",
+    "",
+    "  if (!RedisClient) {",
+    '    throw new Error("Bun RedisClient is unavailable outside the Bun runtime");',
+    "  }",
+    "",
+    "  return new RedisClient(url);",
+    "}",
+    "",
+    "export function getRedisClient(rawEnv: RedisRawEnv = process.env): BunRedisClient {",
+    "  const { url } = resolveRedisEnvironment(rawEnv);",
+    "",
+    "  if (!sharedRedisClient || sharedRedisUrl !== url) {",
+    "    sharedRedisClient?.close();",
+    "    sharedRedisClient = createRedisClient({",
+    "      REDIS_URL: url,",
+    "    });",
+    "    sharedRedisUrl = url;",
+    "  }",
+    "",
+    "  return sharedRedisClient;",
+    "}",
+    "",
+    "export function createRedisRateLimitClient(",
+    "  rawEnv: RedisRawEnv = process.env",
+    "): RateLimitRedisClient {",
+    "  const client = getRedisClient(rawEnv);",
+    "",
+    "  return {",
+    "    async scriptLoad(script: string) {",
+    '      const result = await client.send("SCRIPT", ["LOAD", script]);',
+    "",
+    '      if (typeof result !== "string") {',
+    '        throw new TypeError("Redis SCRIPT LOAD returned a non-string response");',
+    "      }",
+    "",
+    "      return result;",
+    "    },",
+    "    async evalsha<TArgs extends unknown[], TData = unknown>(",
+    "      sha1: string,",
+    "      keys: string[],",
+    "      args: TArgs",
+    "    ) {",
+    '      return client.send("EVALSHA", [',
+    "        sha1,",
+    "        keys.length.toString(),",
+    "        ...keys,",
+    "        ...args.map(stringifyRedisArgument),",
+    "      ]) as Promise<TData>;",
+    "    },",
+    "    decr(key: string) {",
+    "      return client.decr(key);",
+    "    },",
+    "    del(key: string) {",
+    "      return client.del(key);",
+    "    },",
+    "  };",
+    "}",
+    "",
+    "export function resetRedisClientForTests() {",
+    "  sharedRedisClient?.close();",
+    "  sharedRedisClient = null;",
+    "  sharedRedisUrl = null;",
     "}",
     "",
   ].join("\n");
@@ -1847,7 +2388,11 @@ function buildRedisClient() {
 
 function buildRateLimitMiddleware() {
   return [
+    'import { env } from "~/server/lib/env.ts";',
+    'import { getRedisClient } from "~/server/lib/redis.ts";',
+    "",
     "type RateLimitConfig = {",
+    "  keyPrefix: string;",
     "  windowMs: number;",
     "  limit: number;",
     "  keyGenerator: (request: Request) => string;",
@@ -1860,18 +2405,41 @@ function buildRateLimitMiddleware() {
     "}",
     "",
     "export const publicRateLimitConfig: RateLimitConfig = {",
-    '  windowMs: Number(process.env.RATE_LIMIT_WINDOW_MS ?? "60000"),',
-    '  limit: Number(process.env.RATE_LIMIT_PUBLIC_LIMIT ?? "30"),',
-    "  keyGenerator: (req) => getClientIp(req),",
+    '  keyPrefix: "public",',
+    "  windowMs: env.RATE_LIMIT_WINDOW_MS,",
+    "  limit: env.RATE_LIMIT_PUBLIC_LIMIT,",
+    "  keyGenerator: req => getClientIp(req),",
     "};",
     "",
-    "// Implement rate limiting using Redis INCR + PEXPIRE",
-    "export async function checkRateLimit(_request: Request, _config: RateLimitConfig): Promise<void> {",
-    "  // const client = getRedisClient();",
-    "  // const key = `rate-limit:${config.keyGenerator(request)}`;",
-    "  // const current = await client.incr(key);",
-    "  // if (current === 1) await client.pexpire(key, config.windowMs);",
-    "  // if (current > config.limit) throw new Error('Too many requests');",
+    "export const authenticatedRateLimitConfig: RateLimitConfig = {",
+    '  keyPrefix: "authenticated",',
+    "  windowMs: env.RATE_LIMIT_WINDOW_MS,",
+    "  limit: env.RATE_LIMIT_AUTHENTICATED_LIMIT,",
+    '  keyGenerator: req => req.headers.get("x-user-id")?.trim() || getClientIp(req),',
+    "};",
+    "",
+    "export const webhookRateLimitConfig: RateLimitConfig = {",
+    '  keyPrefix: "webhook",',
+    "  windowMs: env.RATE_LIMIT_WINDOW_MS,",
+    "  limit: env.RATE_LIMIT_WEBHOOK_LIMIT,",
+    '  keyGenerator: req => req.headers.get("stripe-signature")?.trim() || getClientIp(req),',
+    "};",
+    "",
+    "export async function checkRateLimit(request: Request, config: RateLimitConfig) {",
+    "  const client = getRedisClient();",
+    "  const key = `rate-limit:${config.keyPrefix}:${config.keyGenerator(request)}`;",
+    "  const current = await client.incr(key);",
+    "",
+    "  if (current === 1) {",
+    "    await client.pexpire(key, config.windowMs);",
+    "  }",
+    "",
+    "  return {",
+    "    isAllowed: current <= config.limit,",
+    "    key,",
+    "    remaining: Math.max(config.limit - current, 0),",
+    "    resetAfterMs: config.windowMs,",
+    "  };",
     "}",
     "",
   ].join("\n");

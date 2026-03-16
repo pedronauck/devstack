@@ -7,7 +7,6 @@ import { MODULE_REGISTRY, resolveSelectedModules } from "./modules/index.ts";
 import type { ModuleName } from "./modules/types.ts";
 import {
   copyDirectoryWithTemplates as copyDirectory,
-  copySelectedSubdirectories,
   ensureDir,
   fileExists,
   pathExists,
@@ -25,11 +24,13 @@ import {
   buildGitignore,
   buildInitTestDbScript,
   buildMakefile,
+  copySkillsToAgentDirs,
   patchPluginNames,
   resolveSkillsForModules,
   SKILLS_DIR,
   TEMPLATES_DIR,
   toJson,
+  writeInstructionFiles,
 } from "./builders/shared.ts";
 import type { GenerateContext } from "./builders/types.ts";
 
@@ -230,6 +231,7 @@ function buildBackendPackageJson(context: GenerateContext): PackageJsonShape {
       "@hono/zod-openapi": "^1.2.2",
       "@hono/zod-validator": "^0.7.6",
       "@logtape/logtape": "^2.0.4",
+      "@opentelemetry/api": "^1.9.0",
       "@scalar/hono-api-reference": "^0.10.2",
       "drizzle-orm": "^0.45.1",
       "es-toolkit": "^1.45.1",
@@ -2688,6 +2690,7 @@ async function writeDynamicFiles(context: GenerateContext) {
   await ensureDir(path.join(context.targetDir, ".husky"));
   await ensureDir(path.join(context.targetDir, "docker/postgres"));
   await ensureDir(path.join(context.targetDir, ".claude"));
+  await ensureDir(path.join(context.targetDir, ".agents"));
 
   await patchPluginNames(context);
 
@@ -2717,10 +2720,7 @@ async function writeDynamicFiles(context: GenerateContext) {
     path.join(context.targetDir, "docker/postgres/init-test-db.sh"),
     buildInitTestDbScript(context)
   );
-  await writeTextFile(
-    path.join(context.targetDir, "CLAUDE.md"),
-    buildClaudeMd(context, separatedClaudeMdBuilder)
-  );
+  await writeInstructionFiles(context.targetDir, buildClaudeMd(context, separatedClaudeMdBuilder));
   await writeTextFile(path.join(context.targetDir, ".claude/settings.json"), buildClaudeSettings());
   await writeTextFile(path.join(context.targetDir, ".github/workflows/ci.yaml"), buildCiWorkflow());
   await writeTextFile(
@@ -2865,13 +2865,14 @@ async function copyModuleSkills(context: GenerateContext) {
       "Skills submodule not initialized. Run: git submodule update --init --recursive"
     );
   }
+
   const selectedSkills = resolveSkillsForModules(context.resolvedModules, context.stackModel);
-  await copySelectedSubdirectories(
-    SKILLS_DIR,
-    path.join(context.targetDir, ".claude/skills"),
-    selectedSkills,
-    context.tokens
-  );
+
+  if (selectedSkills.size === 0) {
+    return;
+  }
+
+  await copySkillsToAgentDirs(context.targetDir, selectedSkills, context);
 }
 
 async function copyModuleOverlays(context: GenerateContext) {

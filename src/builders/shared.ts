@@ -9,16 +9,41 @@ import {
   getBaseSkillMappings,
   getBaseSkills,
 } from "../modules/types.ts";
-import { writeTextFile } from "../utils/files.ts";
+import { copySelectedSubdirectories, writeTextFile } from "../utils/files.ts";
 import { replaceTemplateTokens } from "../utils/template.ts";
 import type { GenerateContext } from "./types.ts";
 
 export const ROOT_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 export const TEMPLATES_DIR = path.join(ROOT_DIR, "templates");
 export const SKILLS_DIR = path.join(ROOT_DIR, "vendor", "skills", "skills");
+export const INSTRUCTION_FILE_NAMES = ["CLAUDE.md", "AGENTS.md"] as const;
+export const SKILL_TARGET_DIRS = [".claude/skills", ".agents/skills"] as const;
 
 export function toJson(value: unknown) {
   return `${JSON.stringify(value, null, 2)}\n`;
+}
+
+export async function writeInstructionFiles(targetDir: string, content: string) {
+  await Promise.all(
+    INSTRUCTION_FILE_NAMES.map(fileName => writeTextFile(path.join(targetDir, fileName), content))
+  );
+}
+
+export async function copySkillsToAgentDirs(
+  targetDir: string,
+  selectedSkills: Set<string>,
+  context: GenerateContext
+) {
+  await Promise.all(
+    SKILL_TARGET_DIRS.map(skillDir =>
+      copySelectedSubdirectories(
+        SKILLS_DIR,
+        path.join(targetDir, skillDir),
+        selectedSkills,
+        context.tokens
+      )
+    )
+  );
 }
 
 // ---------------------------------------------------------------------------
