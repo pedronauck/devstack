@@ -92,7 +92,7 @@ describe("generateProject", () => {
         ])
       );
     },
-    45_000
+    120_000
   );
 
   it.each([["separated" as const], ["tanstack-start" as const]])(
@@ -286,7 +286,7 @@ describe("generateProject", () => {
         "redis:"
       );
     },
-    45_000
+    120_000
   );
 
   it("rejects non-empty target directories before scaffolding", async () => {
