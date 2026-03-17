@@ -110,7 +110,7 @@ make update              # Interactive dependency update (taze)
 
 ## Architecture
 
-**@compozy/devstack** is a CLI scaffold generator that creates full-stack monorepo projects with Bun, Turborepo, React 19, Hono, Drizzle ORM, and PostgreSQL.
+**devstack** is a CLI scaffold generator that creates full-stack monorepo projects with Bun, Turborepo, React 19, Hono, Drizzle ORM, and PostgreSQL.
 
 ### Project Structure
 

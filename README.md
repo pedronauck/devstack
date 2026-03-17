@@ -1,4 +1,4 @@
-# @compozy/devstack
+# devstack
 
 CLI scaffold generator that creates production-ready full-stack monorepo projects with Bun, Turborepo, React 19, Hono, Drizzle ORM, and PostgreSQL.
 
@@ -82,7 +82,7 @@ Modules declare dependencies — selecting **Organizations** automatically inclu
 
 ```bash
 # Run the CLI
-bunx @compozy/devstack
+bunx devstack
 
 # Follow the prompts:
 #   1. App name (e.g., my-saas)
@@ -250,4 +250,4 @@ test: add integration tests for TanStack Start
 
 ## License
 
-@compozy/devstack is licensed under the MIT license. See the [`LICENSE`](LICENSE) file for details.
+devstack is licensed under the MIT license. See the [`LICENSE`](LICENSE) file for details.

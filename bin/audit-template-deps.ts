@@ -180,7 +180,7 @@ async function fetchLatestVersion(packageName: string) {
   const response = await fetch(`https://registry.npmjs.org/${encodeURIComponent(packageName)}`, {
     headers: {
       Accept: "application/json",
-      "User-Agent": "@compozy/devstack template dependency audit",
+      "User-Agent": "devstack template dependency audit",
     },
   });
 

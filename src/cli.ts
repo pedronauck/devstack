@@ -21,7 +21,7 @@ function ensureNotCancelled<T>(value: T | symbol): T {
 }
 
 export async function runCli(): Promise<GeneratorConfig> {
-  p.intro(color.bgCyan(color.black(" @compozy/devstack ")));
+  p.intro(color.bgCyan(color.black(" devstack ")));
 
   const projectName = ensureNotCancelled(
     await p.text({
