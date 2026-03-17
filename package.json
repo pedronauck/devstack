@@ -1,6 +1,6 @@
 {
     "name": "devstack",
-    "version": "0.1.0",
+    "version": "0.1.1",
     "description": "CLI scaffold generator for production-ready full-stack monorepo projects.",
     "keywords": [
         "bun",
