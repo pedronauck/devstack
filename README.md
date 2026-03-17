@@ -169,7 +169,7 @@ The skill set is stack-aware: the **Separated** stack includes the `hono` skill 
 ### Setup
 
 ```bash
-git clone https://github.com/compozy/devstack.git
+git clone https://github.com/pedronauck/devstack.git
 cd devstack
 git submodule update --init --recursive   # Initialize skills submodule
 bun install

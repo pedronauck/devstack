@@ -16,14 +16,14 @@
         "tanstack",
         "turborepo"
     ],
-    "homepage": "https://github.com/compozy/devstack#readme",
+    "homepage": "https://github.com/pedronauck/devstack#readme",
     "bugs": {
-        "url": "https://github.com/compozy/devstack/issues"
+        "url": "https://github.com/pedronauck/devstack/issues"
     },
     "license": "MIT",
     "repository": {
         "type": "git",
-        "url": "git+https://github.com/compozy/devstack.git"
+        "url": "git+https://github.com/pedronauck/devstack.git"
     },
     "bin": {
         "devstack": "./bin/cli.ts"
